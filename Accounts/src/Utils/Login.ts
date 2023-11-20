@@ -15,12 +15,15 @@ export default abstract class LoginUtil {
             value['user'] as JSONObject,
             User
         ) as User;
-        const token: string = value['token'] as string;
 
-        UserUtil.setAccessToken(token);
         UserUtil.setEmail(user.email as Email);
         UserUtil.setUserId(user.id as ObjectID);
-        UserUtil.setName(user.name as Name);
+        UserUtil.setName(user.name || new Name(''));
+        UserUtil.setIsMasterAdmin(user.isMasterAdmin as boolean);
+
+        if (user.profilePictureId) {
+            UserUtil.setProfilePicId(user.profilePictureId);
+        }
 
         Analytics.userAuth(user.email!);
 

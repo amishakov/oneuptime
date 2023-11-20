@@ -10,12 +10,11 @@ import ModelTable, {
 } from 'CommonUI/src/Components/ModelTable/ModelTable';
 import IncidentState from 'Model/Models/IncidentState';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
-import IconProp from 'Common/Types/Icon/IconProp';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import { JSONObject } from 'Common/Types/JSON';
 import Pill from 'CommonUI/src/Components/Pill/Pill';
 import Color from 'Common/Types/Color';
-import SortOrder from 'Common/Types/Database/SortOrder';
+import SortOrder from 'Common/Types/BaseDatabase/SortOrder';
 import BadDataException from 'Common/Types/Exception/BadDataException';
 import Navigation from 'CommonUI/src/Utils/Navigation';
 const IncidentsPage: FunctionComponent<PageComponentProps> = (
@@ -54,14 +53,15 @@ const IncidentsPage: FunctionComponent<PageComponentProps> = (
                 isEditable={true}
                 isCreateable={true}
                 cardProps={{
-                    icon: IconProp.Disc,
                     title: 'Incident State',
                     description:
                         'Incidents have multiple states like - created, acknowledged and resolved. You can more states help you manage incidents here.',
                 }}
                 sortBy="order"
                 sortOrder={SortOrder.Ascending}
-                onBeforeDelete={(item: IncidentState) => {
+                onBeforeDelete={(
+                    item: IncidentState
+                ): Promise<IncidentState> => {
                     if (item.isCreatedState) {
                         throw new BadDataException(
                             'This incident cannot be deleted because its the created incident state of for this project. Created, Acknowledged, Resolved incident states cannot be deleted.'
@@ -80,7 +80,7 @@ const IncidentsPage: FunctionComponent<PageComponentProps> = (
                         );
                     }
 
-                    return item;
+                    return Promise.resolve(item);
                 }}
                 selectMoreFields={{
                     color: true,

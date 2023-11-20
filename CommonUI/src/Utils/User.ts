@@ -6,24 +6,27 @@ import ObjectID from 'Common/Types/ObjectID';
 import Name from 'Common/Types/Name';
 import BadDataException from 'Common/Types/Exception/BadDataException';
 import Dictionary from 'Common/Types/Dictionary';
+import API from 'Common/Utils/API';
+import { IDENTITY_URL } from '../Config';
 
 export default class User {
-    public static getAccessToken(): string {
-        return LocalStorage.getItem('access_token') as string;
+    public static setProfilePicId(id: ObjectID | null): void {
+        if (!id) {
+            LocalStorage.removeItem('profile_pic_id');
+            return;
+        }
+
+        LocalStorage.setItem('profile_pic_id', id.toString());
     }
 
-    public static setAccessToken(token: string): void {
-        LocalStorage.setItem('access_token', token);
-    }
+    public static getProfilePicId(): ObjectID | null {
+        if (!LocalStorage.getItem('profile_pic_id')) {
+            return null;
+        }
 
-    public static setSsoToken(projectId: ObjectID, token: string): void {
-        LocalStorage.setItem('sso_' + projectId.toString(), token);
-    }
-
-    public static getSsoToken(projectId: ObjectID): string | null {
-        return LocalStorage.getItem('sso_' + projectId.toString()) as
-            | string
-            | null;
+        return new ObjectID(
+            (LocalStorage.getItem('profile_pic_id') as string) || ''
+        );
     }
 
     public static isCardRegistered(): boolean {
@@ -50,7 +53,11 @@ export default class User {
         LocalStorage.setItem('user_name', name.toString());
     }
 
-    public static getEmail(): Email {
+    public static getEmail(): Email | null {
+        if (!LocalStorage.getItem('user_email')) {
+            return null;
+        }
+
         return new Email(LocalStorage.getItem('user_email') as string);
     }
 
@@ -75,29 +82,6 @@ export default class User {
         LocalStorage.setItem('project', project);
     }
 
-    public static getAllSsoTokens(): Dictionary<string> {
-        const localStorageItems: Dictionary<string> =
-            LocalStorage.getAllItems();
-        const result: Dictionary<string> = {};
-
-        let numberOfTokens: number = 1;
-
-        for (const key in localStorageItems) {
-            if (!localStorageItems[key]) {
-                continue;
-            }
-
-            if (key.startsWith('sso_')) {
-                result['sso-' + numberOfTokens] = localStorageItems[
-                    key
-                ] as string;
-                numberOfTokens++;
-            }
-        }
-
-        return result;
-    }
-
     public static getProject(): JSONObject {
         return LocalStorage.getItem('project') as JSONObject;
     }
@@ -118,11 +102,40 @@ export default class User {
         return sessionStorage.removeItem('initialUrl');
     }
 
-    public static isLoggedIn(): boolean {
-        return LocalStorage.getItem('access_token') ? true : false;
+    public static isMasterAdmin(): boolean {
+        return LocalStorage.getItem('is_master_admin') as boolean;
     }
 
-    public static logout(): void {
+    public static setIsMasterAdmin(isMasterAdmin: boolean): void {
+        LocalStorage.setItem('is_master_admin', isMasterAdmin);
+    }
+
+    public static isLoggedIn(): boolean {
+        return Boolean(this.getEmail());
+    }
+
+    public static async logout(): Promise<void> {
+        await API.post(
+            URL.fromString(IDENTITY_URL.toString()).addRoute('/logout')
+        );
         LocalStorage.clear();
+    }
+
+    public static getUtmParams(): Dictionary<string> {
+        const localStorageItems: Dictionary<string> =
+            LocalStorage.getAllItems();
+        const result: Dictionary<string> = {};
+
+        for (const key in localStorageItems) {
+            if (!localStorageItems[key]) {
+                continue;
+            }
+
+            if (key.startsWith('utm')) {
+                result[key] = localStorageItems[key] as string;
+            }
+        }
+
+        return result;
     }
 }

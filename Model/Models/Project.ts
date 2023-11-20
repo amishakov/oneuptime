@@ -23,7 +23,13 @@ import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
 import Phone from 'Common/Types/Phone';
 import Email from 'Common/Types/Email';
 import Name from 'Common/Types/Name';
+import Reseller from './Reseller';
+import ResellerPlan from './ResellerPlan';
+import EnableDocumentation from 'Common/Types/Database/EnableDocumentation';
 
+@EnableDocumentation({
+    isMasterAdminApiDocs: true,
+})
 @AllowAccessIfSubscriptionIsUnpaid()
 @MultiTenentQueryAllowed(true)
 @TableAccessControl({
@@ -433,6 +439,37 @@ export default class Model extends TenantModel {
     public isBlocked?: boolean = undefined;
 
     @ColumnAccessControl({
+        create: [Permission.User],
+        read: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanReadProject,
+            Permission.UnAuthorizedSsoUser,
+            Permission.ProjectUser,
+        ],
+        update: [
+            Permission.ProjectOwner,
+            Permission.CanManageProjectBilling,
+            Permission.CanEditProject,
+        ],
+    })
+    @TableColumn({
+        required: false,
+        type: TableColumnType.Boolean,
+        isDefaultValueColumn: true,
+        title: 'Is Feature Flag Monitor Groups Enabled',
+        description: 'Is Feature Flag Monitor Groups Enabled',
+    })
+    @Column({
+        type: ColumnType.Boolean,
+        nullable: true,
+        unique: false,
+        default: false,
+    })
+    public isFeatureFlagMonitorGroupsEnabled?: boolean = undefined;
+
+    @ColumnAccessControl({
         create: [],
         read: [],
         update: [],
@@ -521,7 +558,7 @@ export default class Model extends TenantModel {
     public requireSsoForLogin?: boolean = undefined;
 
     @ColumnAccessControl({
-        create: [],
+        create: [Permission.User],
         read: [],
         update: [],
     })
@@ -534,7 +571,7 @@ export default class Model extends TenantModel {
     public activeMonitorsLimit?: number = undefined;
 
     @ColumnAccessControl({
-        create: [],
+        create: [Permission.User],
         read: [],
         update: [],
     })
@@ -866,6 +903,90 @@ export default class Model extends TenantModel {
         read: [],
         update: [],
     })
+    @TableColumn({ type: TableColumnType.LongText })
+    @Column({
+        type: ColumnType.LongText,
+        length: ColumnLength.LongText,
+        nullable: true,
+        unique: false,
+    })
+    public utmSource?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.User],
+        read: [],
+        update: [],
+    })
+    @TableColumn({ type: TableColumnType.LongText })
+    @Column({
+        type: ColumnType.LongText,
+        length: ColumnLength.LongText,
+        nullable: true,
+        unique: false,
+    })
+    public utmMedium?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.User],
+        read: [],
+        update: [],
+    })
+    @TableColumn({ type: TableColumnType.LongText })
+    @Column({
+        type: ColumnType.LongText,
+        length: ColumnLength.LongText,
+        nullable: true,
+        unique: false,
+    })
+    public utmCampaign?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.User],
+        read: [],
+        update: [],
+    })
+    @TableColumn({ type: TableColumnType.LongText })
+    @Column({
+        type: ColumnType.LongText,
+        length: ColumnLength.LongText,
+        nullable: true,
+        unique: false,
+    })
+    public utmTerm?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.User],
+        read: [],
+        update: [],
+    })
+    @TableColumn({ type: TableColumnType.LongText })
+    @Column({
+        type: ColumnType.LongText,
+        length: ColumnLength.LongText,
+        nullable: true,
+        unique: false,
+    })
+    public utmContent?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.User],
+        read: [],
+        update: [],
+    })
+    @TableColumn({ type: TableColumnType.LongText })
+    @Column({
+        type: ColumnType.LongText,
+        length: ColumnLength.LongText,
+        nullable: true,
+        unique: false,
+    })
+    public utmUrl?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.User],
+        read: [],
+        update: [],
+    })
     @TableColumn({ type: TableColumnType.ShortText })
     @Column({
         type: ColumnType.ShortText,
@@ -874,4 +995,126 @@ export default class Model extends TenantModel {
         unique: false,
     })
     public createdOwnerCompanyName?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.User],
+        read: [Permission.ProjectOwner],
+        update: [],
+    })
+    @TableColumn({
+        manyToOneRelationColumn: 'resellerId',
+        type: TableColumnType.Entity,
+        modelType: Reseller,
+        title: 'Reseller',
+        description:
+            'Relation to Reseller Resource in which this object belongs',
+    })
+    @ManyToOne(
+        (_type: string) => {
+            return Reseller;
+        },
+        {
+            eager: false,
+            nullable: true,
+            onDelete: 'CASCADE',
+            orphanedRowAction: 'nullify',
+        }
+    )
+    @JoinColumn({ name: 'resellerId' })
+    public reseller?: Reseller = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.User],
+        read: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanReadProject,
+            Permission.UnAuthorizedSsoUser,
+            Permission.ProjectUser,
+        ],
+        update: [],
+    })
+    @Index()
+    @TableColumn({
+        type: TableColumnType.ObjectID,
+        required: false,
+        canReadOnRelationQuery: true,
+        title: 'Reseller ID',
+        description:
+            'ID of your OneUptime Reseller in which this object belongs',
+    })
+    @Column({
+        type: ColumnType.ObjectID,
+        nullable: true,
+        transformer: ObjectID.getDatabaseTransformer(),
+    })
+    public resellerId?: ObjectID = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.User],
+        read: [Permission.ProjectOwner],
+        update: [],
+    })
+    @TableColumn({
+        manyToOneRelationColumn: 'ResellerPlanId',
+        type: TableColumnType.Entity,
+        modelType: ResellerPlan,
+        title: 'ResellerPlan',
+        description:
+            'Relation to ResellerPlan Resource in which this object belongs',
+    })
+    @ManyToOne(
+        (_type: string) => {
+            return ResellerPlan;
+        },
+        {
+            eager: false,
+            nullable: true,
+            onDelete: 'CASCADE',
+            orphanedRowAction: 'nullify',
+        }
+    )
+    @JoinColumn({ name: 'resellerPlanId' })
+    public resellerPlan?: ResellerPlan = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.User],
+        read: [Permission.ProjectOwner],
+        update: [],
+    })
+    @Index()
+    @TableColumn({
+        type: TableColumnType.ObjectID,
+        required: false,
+        canReadOnRelationQuery: true,
+        title: 'Reseller Plan ID',
+        description:
+            'ID of your OneUptime Reseller Plan in which this object belongs',
+    })
+    @Column({
+        type: ColumnType.ObjectID,
+        nullable: true,
+        transformer: ObjectID.getDatabaseTransformer(),
+    })
+    public resellerPlanId?: ObjectID = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.User],
+        read: [],
+        update: [],
+    })
+    @TableColumn({
+        required: false,
+        type: TableColumnType.ShortText,
+        title: 'License ID',
+        description: 'License ID from a OneUptime Reseller',
+        canReadOnRelationQuery: true,
+    })
+    @Column({
+        nullable: true,
+        type: ColumnType.ShortText,
+        length: ColumnLength.ShortText,
+    })
+    public resellerLicenseId?: string = undefined;
 }

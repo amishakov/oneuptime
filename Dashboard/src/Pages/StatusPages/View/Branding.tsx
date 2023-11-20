@@ -8,7 +8,6 @@ import SideMenu from './SideMenu';
 import ObjectID from 'Common/Types/ObjectID';
 import StatusPage from 'Model/Models/StatusPage';
 import CardModelDetail from 'CommonUI/src/Components/ModelDetail/CardModelDetail';
-import IconProp from 'Common/Types/Icon/IconProp';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import Navigation from 'CommonUI/src/Utils/Navigation';
@@ -61,7 +60,6 @@ const StatusPageDelete: FunctionComponent<PageComponentProps> = (
                 cardProps={{
                     title: 'Title and Description',
                     description: 'This will also be used for SEO.',
-                    icon: IconProp.Text,
                 }}
                 editButtonText={'Edit'}
                 isEditable={true}
@@ -116,7 +114,6 @@ const StatusPageDelete: FunctionComponent<PageComponentProps> = (
                 cardProps={{
                     title: 'Favicon',
                     description: 'Favicon will be used for SEO.',
-                    icon: IconProp.Image,
                 }}
                 isEditable={true}
                 editButtonText={'Edit Favicon'}
@@ -158,7 +155,6 @@ const StatusPageDelete: FunctionComponent<PageComponentProps> = (
                     title: 'Overview Page',
                     description:
                         'Essential branding elements for overview page.',
-                    icon: IconProp.Text,
                 }}
                 isEditable={true}
                 editButtonText={'Edit Branding'}

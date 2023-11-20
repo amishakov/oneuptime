@@ -15,13 +15,21 @@ import Permission from 'Common/Types/Permission';
 import ColumnAccessControl from 'Common/Types/Database/AccessControl/ColumnAccessControl';
 import TenantColumn from 'Common/Types/Database/TenantColumn';
 import TableMetadata from 'Common/Types/Database/TableMetadata';
-import EnableWorkflow from 'Common/Types/Model/EnableWorkflow';
+import EnableWorkflow from 'Common/Types/Database/EnableWorkflow';
 import IconProp from 'Common/Types/Icon/IconProp';
 import StatusPage from './StatusPage';
 import Monitor from './Monitor';
 import StatusPageGroup from './StatusPageGroup';
 import CanAccessIfCanReadOn from 'Common/Types/Database/CanAccessIfCanReadOn';
-import EnableDocumentation from 'Common/Types/Model/EnableDocumentation';
+import EnableDocumentation from 'Common/Types/Database/EnableDocumentation';
+import MonitorGroup from './MonitorGroup';
+
+export enum UptimePrecision {
+    NO_DECIMAL = '99% (No Decimal)',
+    ONE_DECIMAL = '99.9% (One Decimal)',
+    TWO_DECIMAL = '99.99% (Two Decimal)',
+    THREE_DECIMAL = '99.999% (Three Decimal)',
+}
 
 @EnableDocumentation()
 @CanAccessIfCanReadOn('statusPage')
@@ -271,17 +279,95 @@ export default class StatusPageResource extends BaseModel {
     @Index()
     @TableColumn({
         type: TableColumnType.ObjectID,
-        required: true,
+        required: false,
         title: 'Monitor ID',
         description:
             'Relation to Monitor ID Resource in which this object belongs',
     })
     @Column({
         type: ColumnType.ObjectID,
-        nullable: false,
+        nullable: true,
         transformer: ObjectID.getDatabaseTransformer(),
     })
     public monitorId?: ObjectID = undefined;
+
+    @ColumnAccessControl({
+        create: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanCreateStatusPageResource,
+        ],
+        read: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanReadStatusPageResource,
+        ],
+        update: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanEditStatusPageResource,
+        ],
+    })
+    @TableColumn({
+        manyToOneRelationColumn: 'monitorGroupId',
+        type: TableColumnType.Entity,
+        modelType: MonitorGroup,
+        title: 'Monitor Group',
+        description:
+            'Relation to Monitor Group Resource in which this object belongs',
+    })
+    @ManyToOne(
+        (_type: string) => {
+            return MonitorGroup;
+        },
+        {
+            eager: false,
+            nullable: true,
+            onDelete: 'CASCADE',
+            orphanedRowAction: 'nullify',
+        }
+    )
+    @JoinColumn({ name: 'monitorGroupId' })
+    public monitorGroup?: MonitorGroup = undefined;
+
+    @ColumnAccessControl({
+        create: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanCreateStatusPageResource,
+        ],
+        read: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanReadStatusPageResource,
+        ],
+        update: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanEditStatusPageResource,
+        ],
+    })
+    @Index()
+    @TableColumn({
+        type: TableColumnType.ObjectID,
+        required: false,
+        title: 'Monitor Group ID',
+        description:
+            'Relation to Monitor Group ID Resource in which this object belongs',
+    })
+    @Column({
+        type: ColumnType.ObjectID,
+        nullable: true,
+        transformer: ObjectID.getDatabaseTransformer(),
+    })
+    public monitorGroupId?: ObjectID = undefined;
+
     @ColumnAccessControl({
         create: [
             Permission.ProjectOwner,
@@ -489,6 +575,71 @@ export default class StatusPageResource extends BaseModel {
         default: true,
     })
     public showCurrentStatus?: boolean = undefined;
+
+    @ColumnAccessControl({
+        create: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanCreateStatusPageResource,
+        ],
+        read: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanReadStatusPageResource,
+        ],
+        update: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanEditStatusPageResource,
+        ],
+    })
+    @TableColumn({
+        isDefaultValueColumn: true,
+        type: TableColumnType.Boolean,
+        title: 'Show Uptime Percent',
+        description: 'Show uptime percent of this monitor for the last 90 days',
+    })
+    @Column({
+        type: ColumnType.Boolean,
+        default: false,
+    })
+    public showUptimePercent?: boolean = undefined;
+
+    @ColumnAccessControl({
+        create: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanCreateStatusPageResource,
+        ],
+        read: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanReadStatusPageResource,
+        ],
+        update: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanEditStatusPageResource,
+        ],
+    })
+    @TableColumn({
+        type: TableColumnType.ShortText,
+        title: 'Uptime Percent Precision',
+        required: false,
+        description:
+            'Precision of uptime percent of this monitor for the last 90 days',
+    })
+    @Column({
+        type: ColumnType.ShortText,
+        nullable: true,
+    })
+    public uptimePercentPrecision?: UptimePrecision = undefined;
 
     @ColumnAccessControl({
         create: [

@@ -29,6 +29,10 @@ export default class OneUptimeDate {
         return this.getSomeDaysAgo(new PositiveNumber(1));
     }
 
+    public static fromUnixNano(timestamp: number): Date {
+        return moment(timestamp / 1000000).toDate();
+    }
+
     public static getSecondsTo(date: Date): number {
         date = this.fromString(date);
         const dif: number = date.getTime() - this.getCurrentDate().getTime();
@@ -86,11 +90,20 @@ export default class OneUptimeDate {
         return moment(date).add(minutes, 'minutes').toDate();
     }
 
+    public static addRemoveSeconds(date: Date, seconds: number): Date {
+        date = this.fromString(date);
+        return moment(date).add(seconds, 'seconds').toDate();
+    }
+
     public static getSecondsInDays(days: PositiveNumber | number): number {
         if (!(days instanceof PositiveNumber)) {
             days = new PositiveNumber(days);
         }
         return days.positiveNumber * 24 * 60 * 60;
+    }
+
+    public static getMillisecondsInDays(days: PositiveNumber | number): number {
+        return this.getSecondsInDays(days) * 1000;
     }
 
     public static getSomeHoursAgo(hours: PositiveNumber | number): Date {
@@ -216,7 +229,7 @@ export default class OneUptimeDate {
         let hasMins: boolean = false;
         if (hours !== '00') {
             hasHours = true;
-            text += hours + ' hours';
+            text += hours + ' hours ';
         }
 
         if (mins !== '00' || hasHours) {
@@ -226,7 +239,7 @@ export default class OneUptimeDate {
                 text += ', ';
             }
 
-            text += mins + ' minutes';
+            text += mins + ' minutes ';
         }
 
         if (!(hasHours && hasMins)) {
@@ -344,6 +357,12 @@ export default class OneUptimeDate {
         date = this.fromString(date);
         startDate = this.fromString(startDate);
         return moment(date).isAfter(startDate);
+    }
+
+    public static isEqualBySeconds(date: Date, startDate: Date): boolean {
+        date = this.fromString(date);
+        startDate = this.fromString(startDate);
+        return moment(date).isSame(startDate, 'seconds');
     }
 
     public static hasExpired(expirationDate: Date): boolean {
@@ -477,8 +496,11 @@ export default class OneUptimeDate {
         );
     }
 
-    public static getDayInSeconds(): number {
-        return 24 * 60 * 60;
+    public static getDayInSeconds(days?: number | undefined): number {
+        if (!days) {
+            days = 1;
+        }
+        return 24 * 60 * 60 * days;
     }
 
     public static getCurrentTimezoneString(): string {

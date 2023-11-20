@@ -2,23 +2,24 @@ import ObjectID from 'Common/Types/ObjectID';
 import Phone from 'Common/Types/Phone';
 import {
     SMSDefaultCostInCents,
-    TwilioAccountSid,
-    TwilioAuthToken,
-    TwilioPhoneNumber,
+    SMSHighRiskCostInCents,
+    TwilioConfig,
+    getTwilioConfig,
 } from '../Config';
 import Twilio from 'twilio';
 import SmsLog from 'Model/Models/SmsLog';
 import SmsStatus from 'Common/Types/SmsStatus';
-import { IsBillingEnabled } from 'CommonServer/Config';
+import { IsBillingEnabled } from 'CommonServer/EnvironmentConfig';
 import SmsLogService from 'CommonServer/Services/SmsLogService';
 import ProjectService from 'CommonServer/Services/ProjectService';
 import Project from 'Model/Models/Project';
 import { MessageInstance } from 'twilio/lib/rest/api/v2010/account/message';
 import NotificationService from 'CommonServer/Services/NotificationService';
 import logger from 'CommonServer/Utils/Logger';
-import TwilioUtil from '../Utils/Twilio';
 import UserOnCallLogTimelineService from 'CommonServer/Services/UserOnCallLogTimelineService';
 import UserNotificationStatus from 'Common/Types/UserNotification/UserNotificationStatus';
+import BadDataException from 'Common/Types/Exception/BadDataException';
+import { isHighRiskPhoneNumber } from 'Common/Types/Call/CallRequest';
 
 export default class SmsService {
     public static async sendSms(
@@ -31,13 +32,30 @@ export default class SmsService {
             userOnCallLogTimelineId?: ObjectID | undefined;
         }
     ): Promise<void> {
-        TwilioUtil.checkEnvironmentVariables();
+        let smsCost: number = 0;
 
-        const client: Twilio.Twilio = Twilio(TwilioAccountSid, TwilioAuthToken);
+        if (IsBillingEnabled) {
+            smsCost = SMSDefaultCostInCents / 100;
+
+            if (isHighRiskPhoneNumber(to)) {
+                smsCost = SMSHighRiskCostInCents / 100;
+            }
+        }
+
+        const twilioConfig: TwilioConfig | null = await getTwilioConfig();
+
+        if (!twilioConfig) {
+            throw new BadDataException('Twilio Config not found');
+        }
+
+        const client: Twilio.Twilio = Twilio(
+            twilioConfig.accountSid,
+            twilioConfig.authToken
+        );
 
         const smsLog: SmsLog = new SmsLog();
         smsLog.toNumber = to;
-        smsLog.fromNumber = options.from || new Phone(TwilioPhoneNumber);
+        smsLog.fromNumber = options.from || twilioConfig.phoneNumber;
         smsLog.smsText =
             options && options.isSensitive
                 ? 'This message is sensitive and is not logged'
@@ -71,6 +89,7 @@ export default class SmsService {
                 if (!project) {
                     smsLog.status = SmsStatus.Error;
                     smsLog.statusMessage = `Project ${options.projectId.toString()} not found.`;
+                    logger.error(smsLog.statusMessage);
                     await SmsLogService.create({
                         data: smsLog,
                         props: {
@@ -83,7 +102,7 @@ export default class SmsService {
                 if (!project.enableSmsNotifications) {
                     smsLog.status = SmsStatus.Error;
                     smsLog.statusMessage = `SMS notifications are not enabled for this project. Please enable SMS notifications in Project Settings.`;
-
+                    logger.error(smsLog.statusMessage);
                     await SmsLogService.create({
                         data: smsLog,
                         props: {
@@ -128,6 +147,7 @@ export default class SmsService {
                 if (!project.smsOrCallCurrentBalanceInUSDCents) {
                     smsLog.status = SmsStatus.LowBalance;
                     smsLog.statusMessage = `Project ${options.projectId.toString()} does not have enough SMS balance.`;
+                    logger.error(smsLog.statusMessage);
                     await SmsLogService.create({
                         data: smsLog,
                         props: {
@@ -153,24 +173,18 @@ export default class SmsService {
                             `We tried to send an SMS to ${to.toString()} with message: <br/> <br/> ${message} <br/>This SMS was not sent because project does not have enough balance to send SMS. Current balance is ${
                                 (project.smsOrCallCurrentBalanceInUSDCents ||
                                     0) / 100
-                            } USD cents. Required balance to send this SMS should is ${
-                                SMSDefaultCostInCents / 100
-                            } USD. Please enable auto recharge or recharge manually.`
+                            } USD cents. Required balance to send this SMS should is ${smsCost} USD. Please enable auto recharge or recharge manually.`
                         );
                     }
                     return;
                 }
 
-                if (
-                    project.smsOrCallCurrentBalanceInUSDCents <
-                    SMSDefaultCostInCents
-                ) {
+                if (project.smsOrCallCurrentBalanceInUSDCents < smsCost * 100) {
                     smsLog.status = SmsStatus.LowBalance;
                     smsLog.statusMessage = `Project does not have enough balance to send SMS. Current balance is ${
                         project.smsOrCallCurrentBalanceInUSDCents / 100
-                    } USD. Required balance is ${
-                        SMSDefaultCostInCents / 100
-                    } USD to send this SMS.`;
+                    } USD. Required balance is ${smsCost} USD to send this SMS.`;
+                    logger.error(smsLog.statusMessage);
                     await SmsLogService.create({
                         data: smsLog,
                         props: {
@@ -194,9 +208,7 @@ export default class SmsService {
                                 (project.name || ''),
                             `We tried to send an SMS to ${to.toString()} with message: <br/> <br/> ${message} <br/> <br/> This SMS was not sent because project does not have enough balance to send SMS. Current balance is ${
                                 project.smsOrCallCurrentBalanceInUSDCents / 100
-                            } USD. Required balance is ${
-                                SMSDefaultCostInCents / 100
-                            } USD to send this SMS. Please enable auto recharge or recharge manually.`
+                            } USD. Required balance is ${smsCost} USD to send this SMS. Please enable auto recharge or recharge manually.`
                         );
                     }
                     return;
@@ -210,18 +222,20 @@ export default class SmsService {
                     from:
                         options && options.from
                             ? options.from.toString()
-                            : TwilioPhoneNumber.toString(), // From a valid Twilio number
+                            : twilioConfig.phoneNumber.toString(), // From a valid Twilio number
                 });
 
             smsLog.status = SmsStatus.Success;
             smsLog.statusMessage = 'Message ID: ' + twillioMessage.sid;
 
+            logger.info('SMS message sent successfully.');
+            logger.info(smsLog.statusMessage);
+
             if (IsBillingEnabled && project) {
-                smsLog.smsCostInUSDCents = SMSDefaultCostInCents;
+                smsLog.smsCostInUSDCents = smsCost * 100;
 
                 project.smsOrCallCurrentBalanceInUSDCents = Math.floor(
-                    project.smsOrCallCurrentBalanceInUSDCents! -
-                        SMSDefaultCostInCents
+                    project.smsOrCallCurrentBalanceInUSDCents! - smsCost * 100
                 );
 
                 await ProjectService.updateOneById({
@@ -241,6 +255,9 @@ export default class SmsService {
             smsLog.status = SmsStatus.Error;
             smsLog.statusMessage =
                 e && e.message ? e.message.toString() : e.toString();
+
+            logger.error('SMS message failed to send.');
+            logger.error(smsLog.statusMessage);
         }
 
         if (options.projectId) {

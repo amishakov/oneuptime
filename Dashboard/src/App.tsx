@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Route from 'Common/Types/API/Route';
 import {
     Routes,
@@ -25,6 +25,7 @@ import WorkflowDelete from './Pages/Workflow/View/Delete';
 import WorkflowBuilder from './Pages/Workflow/View/Builder';
 import WorkflowOverview from './Pages/Workflow/View/Index';
 import WorkflowVariables from './Pages/Workflow/View/Variable';
+import WorkflowSettings from './Pages/Workflow/View/Settings';
 
 import StatusPages from './Pages/StatusPages/StatusPages';
 import StatusPagesView from './Pages/StatusPages/View/Index';
@@ -76,7 +77,11 @@ import Logs from './Pages/Logs/Logs';
 import Navigation from 'CommonUI/src/Utils/Navigation';
 import RouteMap from './Utils/RouteMap';
 import PageMap from './Utils/PageMap';
-import { ACCOUNTS_URL, BILLING_ENABLED } from 'CommonUI/src/Config';
+import {
+    ACCOUNTS_URL,
+    BILLING_ENABLED,
+    DASHBOARD_API_URL,
+} from 'CommonUI/src/Config';
 // Settings Pages
 import ProjectSettings from './Pages/Settings/ProjectSettings';
 import SettingsDangerZone from './Pages/Settings/DangerZone';
@@ -85,6 +90,7 @@ import SettingsApiKeyView from './Pages/Settings/APIKeyView';
 import SettingLabels from './Pages/Settings/Labels';
 import SettingProbes from './Pages/Settings/Probes';
 import SettingCustomSMTP from './Pages/Settings/CustomSMTP';
+import SettingFeatureFlags from './Pages/Settings/FeatureFlags';
 import SettingsTeams from './Pages/Settings/Teams';
 import SettingsTeamView from './Pages/Settings/TeamView';
 import SettingsMonitors from './Pages/Settings/MonitorStatus';
@@ -104,6 +110,13 @@ import StatusPageCustomFields from './Pages/Settings/StatusPageCustomFields';
 import IncidentCustomFields from './Pages/Settings/IncidentCustomFields';
 import OnCallDutyPolicyCustomFields from './Pages/Settings/OnCallDutyPolicyCustomFields';
 import ScheduledMaintenanceCustomFields from './Pages/Settings/ScheduledMaintenanceCusomFields';
+import IncidentTemplates from './Pages/Settings/IncidentTemplates';
+import IncidentTemplatesView from './Pages/Settings/IncidentTemplatesView';
+import IncidentNoteTemplates from './Pages/Settings/IncidentNoteTemplates';
+import IncidentNoteTemplateView from './Pages/Settings/IncidentNoteTemplateView';
+
+import ScheduledMaintenanceNoteTemplates from './Pages/Settings/ScheduledMaintenanceNoteTemplates';
+import ScheduledMaintenanceNoteTemplateView from './Pages/Settings/ScheduledMaintenanceNoteTemplateView';
 
 import ActiveIncidents from './Pages/Global/ActiveIncidents';
 import ProjectInvitations from './Pages/Global/ProjectInvitations';
@@ -139,6 +152,14 @@ import MonitorViewProbes from './Pages/Monitor/View/Probes';
 import MonitorViewOwner from './Pages/Monitor/View/Owners';
 import MonitorViewSettings from './Pages/Monitor/View/Settings';
 
+// Monitor Groups.
+import MonitorGroups from './Pages/MonitorGroup/MonitorGroups';
+import MonitorGroupView from './Pages/MonitorGroup/View/Index';
+import MonitorGroupViewDelete from './Pages/MonitorGroup/View/Delete';
+import MonitorGroupViewMonitors from './Pages/MonitorGroup/View/Monitors';
+import MonitorGroupViewIncidents from './Pages/MonitorGroup/View/Incidents';
+import MonitorGroupViewOwners from './Pages/MonitorGroup/View/Owners';
+
 import User from 'CommonUI/src/Utils/User';
 import Logout from './Pages/Logout/Logout';
 import ModelAPI, { ListResult } from 'CommonUI/src/Utils/ModelAPI/ModelAPI';
@@ -158,14 +179,31 @@ import UserSettingsNotificationRules from './Pages/UserSettings/OnCallRules';
 import UserSettingsNotificationLogs from './Pages/UserSettings/OnCallLogs';
 import UserSettingsNotificationLogsTimeline from './Pages/UserSettings/OnCallLogsTimeline';
 import UserSettingsNotiifcationSetting from './Pages/UserSettings/NotificationSettings';
+import URL from 'Common/Types/API/URL';
 
-const App: FunctionComponent = () => {
+// Add Telemetry.
+import TelemetryServices from './Pages/Telemetry/Services';
+import TelemetryServiceView from './Pages/Telemetry/Services/View/Index';
+import TelemetryServiceViewDelete from './Pages/Telemetry/Services/View/Delete';
+import TelemetryServiceViewLogs from './Pages/Telemetry/Services/View/Logs/Index';
+import TelemetryServiceViewTraces from './Pages/Telemetry/Services/View/Traces/Index';
+
+const App: () => JSX.Element = () => {
     Navigation.setNavigateHook(useNavigate());
     Navigation.setLocation(useLocation());
     Navigation.setParams(useParams());
 
     if (!User.isLoggedIn()) {
-        Navigation.navigate(ACCOUNTS_URL);
+        if (Navigation.getQueryStringByName('sso_token')) {
+            Navigation.navigate(
+                URL.fromString(ACCOUNTS_URL.toString()).addQueryParam(
+                    'sso',
+                    'true'
+                )
+            );
+        } else {
+            Navigation.navigate(URL.fromString(ACCOUNTS_URL.toString()));
+        }
     }
 
     const [isLoading, setLoading] = useState<boolean>(true);
@@ -249,7 +287,7 @@ const App: FunctionComponent = () => {
         };
     }, []);
 
-    const fetchProjects: Function = async (): Promise<void> => {
+    const fetchProjects: () => Promise<void> = async (): Promise<void> => {
         setLoading(true);
 
         // get list of projects.
@@ -259,16 +297,14 @@ const App: FunctionComponent = () => {
                 {},
                 50,
                 0,
-                {
-                    name: true,
-                    _id: true,
-                    trialEndsAt: true,
-                    paymentProviderPlanId: true,
-                },
+                {},
                 {},
 
                 {
                     isMultiTenantRequest: true,
+                    overrideRequestUrl: URL.fromString(
+                        DASHBOARD_API_URL.toString()
+                    ).addRoute('/project/list-user-projects'),
                 }
             );
             setProjects(result.data);
@@ -280,7 +316,7 @@ const App: FunctionComponent = () => {
     };
 
     useAsyncEffect(async () => {
-        fetchProjects();
+        await fetchProjects();
     }, []);
 
     const commonPageProps: PageComponentProps = {
@@ -337,6 +373,103 @@ const App: FunctionComponent = () => {
                             onClickShowProjectModal={() => {
                                 setShowProjectModal(true);
                             }}
+                        />
+                    }
+                />
+
+                {/* Telemetry Pages */}
+
+                <PageRoute
+                    path={RouteMap[PageMap.TELEMETRY]?.toString() || ''}
+                    element={
+                        <TelemetryServices
+                            {...commonPageProps}
+                            pageRoute={RouteMap[PageMap.TELEMETRY] as Route}
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[PageMap.TELEMETRY_SERVICES]?.toString() || ''
+                    }
+                    element={
+                        <TelemetryServices
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[PageMap.TELEMETRY_SERVICES] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[PageMap.TELEMETRY_SERVICES_VIEW]?.toString() ||
+                        ''
+                    }
+                    element={
+                        <TelemetryServiceView
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.TELEMETRY_SERVICES_VIEW
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[
+                            PageMap.TELEMETRY_SERVICES_VIEW_DELETE
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <TelemetryServiceViewDelete
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.TELEMETRY_SERVICES_VIEW_DELETE
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[
+                            PageMap.TELEMETRY_SERVICES_VIEW_LOGS
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <TelemetryServiceViewLogs
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.TELEMETRY_SERVICES_VIEW_LOGS
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[
+                            PageMap.TELEMETRY_SERVICES_VIEW_TRACES
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <TelemetryServiceViewTraces
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.TELEMETRY_SERVICES_VIEW_TRACES
+                                ] as Route
+                            }
                         />
                     }
                 />
@@ -640,6 +773,23 @@ const App: FunctionComponent = () => {
                             {...commonPageProps}
                             pageRoute={
                                 RouteMap[PageMap.WORKFLOW_VARIABLES] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[PageMap.WORKFLOW_VIEW_SETTINGS]?.toString() ||
+                        ''
+                    }
+                    element={
+                        <WorkflowSettings
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.WORKFLOW_VIEW_SETTINGS
+                                ] as Route
                             }
                         />
                     }
@@ -1471,6 +1621,136 @@ const App: FunctionComponent = () => {
 
                 <PageRoute
                     path={
+                        RouteMap[
+                            PageMap.SETTINGS_INCIDENT_TEMPLATES
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <IncidentTemplates
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.SETTINGS_INCIDENT_TEMPLATES
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[
+                            PageMap.SETTINGS_INCIDENT_TEMPLATES_VIEW
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <IncidentTemplatesView
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.SETTINGS_INCIDENT_TEMPLATES_VIEW
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[PageMap.SETTINGS_FEATURE_FLAGS]?.toString() ||
+                        ''
+                    }
+                    element={
+                        <SettingFeatureFlags
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.SETTINGS_FEATURE_FLAGS
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[
+                            PageMap.SETTINGS_INCIDENT_NOTE_TEMPLATES
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <IncidentNoteTemplates
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.SETTINGS_INCIDENT_NOTE_TEMPLATES
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[
+                            PageMap.SETTINGS_INCIDENT_NOTE_TEMPLATES_VIEW
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <IncidentNoteTemplateView
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap
+                                        .SETTINGS_INCIDENT_NOTE_TEMPLATES_VIEW
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[
+                            PageMap
+                                .SETTINGS_SCHEDULED_MAINTENANCE_NOTE_TEMPLATES
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <ScheduledMaintenanceNoteTemplates
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap
+                                        .SETTINGS_SCHEDULED_MAINTENANCE_NOTE_TEMPLATES
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[
+                            PageMap
+                                .SETTINGS_SCHEDULED_MAINTENANCE_NOTE_TEMPLATES_VIEW
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <ScheduledMaintenanceNoteTemplateView
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap
+                                        .SETTINGS_SCHEDULED_MAINTENANCE_NOTE_TEMPLATES_VIEW
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
                         RouteMap[PageMap.SETTINGS_CALL_LOGS]?.toString() || ''
                     }
                     element={
@@ -1515,10 +1795,10 @@ const App: FunctionComponent = () => {
                     }
                     element={
                         <SettingsDangerZone
-                            onProjectDeleted={() => {
+                            onProjectDeleted={async () => {
                                 setSelectedProject(null);
                                 setProjects([]);
-                                fetchProjects();
+                                await fetchProjects();
                                 Navigation.navigate(RouteMap[PageMap.INIT]!);
                             }}
                             {...commonPageProps}
@@ -2168,6 +2448,106 @@ const App: FunctionComponent = () => {
                             pageRoute={
                                 RouteMap[
                                     PageMap.USER_SETTINGS_ON_CALL_RULES
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                {/** Monitor Groups */}
+
+                <PageRoute
+                    path={RouteMap[PageMap.MONITOR_GROUPS]?.toString() || ''}
+                    element={
+                        <MonitorGroups
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[PageMap.MONITOR_GROUPS] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[PageMap.MONITOR_GROUP_VIEW]?.toString() || ''
+                    }
+                    element={
+                        <MonitorGroupView
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[PageMap.MONITOR_GROUP_VIEW] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[
+                            PageMap.MONITOR_GROUP_VIEW_DELETE
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <MonitorGroupViewDelete
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.MONITOR_GROUP_VIEW_DELETE
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[
+                            PageMap.MONITOR_GROUP_VIEW_MONITORS
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <MonitorGroupViewMonitors
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.MONITOR_GROUP_VIEW_MONITORS
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[
+                            PageMap.MONITOR_GROUP_VIEW_INCIDENTS
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <MonitorGroupViewIncidents
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.MONITOR_GROUP_VIEW_INCIDENTS
+                                ] as Route
+                            }
+                        />
+                    }
+                />
+
+                <PageRoute
+                    path={
+                        RouteMap[
+                            PageMap.MONITOR_GROUP_VIEW_OWNERS
+                        ]?.toString() || ''
+                    }
+                    element={
+                        <MonitorGroupViewOwners
+                            {...commonPageProps}
+                            pageRoute={
+                                RouteMap[
+                                    PageMap.MONITOR_GROUP_VIEW_OWNERS
                                 ] as Route
                             }
                         />

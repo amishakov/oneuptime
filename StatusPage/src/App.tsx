@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Route from 'Common/Types/API/Route';
 import {
     Routes,
@@ -37,12 +37,13 @@ import ObjectID from 'Common/Types/ObjectID';
 import Logout from './Pages/Accounts/Logout';
 import StatusPageUtil from './Utils/StatusPage';
 
-const App: FunctionComponent = () => {
+const App: () => JSX.Element = () => {
     Navigation.setNavigateHook(useNavigate());
     Navigation.setLocation(useLocation());
     Navigation.setParams(useParams());
 
     const [isPreview, setIsPreview] = useState<boolean>(false);
+    const [enableSubscribers, setEnableSubscribers] = useState<boolean>(true);
     const [statusPageName, setStatusPageName] = useState<string>('');
     const [statusPageLogoFileId, setStatusPageLogoFileId] =
         useState<string>('');
@@ -70,6 +71,7 @@ const App: FunctionComponent = () => {
     return (
         <MasterPage
             isPreview={isPreview}
+            enableSubscribers={enableSubscribers}
             isPrivateStatusPage={isPrivateStatusPage}
             onLoadComplete={(masterpage: JSONObject) => {
                 document.title =
@@ -108,6 +110,14 @@ const App: FunctionComponent = () => {
                         masterpage || {},
                         'statusPage.isPublicStatusPage'
                     ) as boolean;
+
+                const enableSubscribers: boolean =
+                    JSONFunctions.getJSONValueInPath(
+                        masterpage || {},
+                        'statusPage.enableSubscribers'
+                    ) as boolean;
+
+                setEnableSubscribers(enableSubscribers);
 
                 StatusPageUtil.setIsPrivateStatusPage(isPrivateStatusPage);
                 setIsPrivateStatusPage(isPrivateStatusPage);

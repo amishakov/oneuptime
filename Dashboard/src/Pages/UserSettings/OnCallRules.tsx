@@ -20,7 +20,6 @@ import PageLoader from 'CommonUI/src/Components/Loader/PageLoader';
 import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import User from 'CommonUI/src/Utils/User';
 import UserNotificationRule from 'Model/Models/UserNotificationRule';
-import IconProp from 'Common/Types/Icon/IconProp';
 import UserCall from 'Model/Models/UserCall';
 import UserEmail from 'Model/Models/UserEmail';
 import UserSMS from 'Model/Models/UserSMS';
@@ -31,7 +30,7 @@ import NotifyAfterDropdownOptions from '../../Components/NotificationRule/Notify
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import { JSONObject } from 'Common/Types/JSON';
 import NotificationRuleType from 'Common/Types/NotificationRule/NotificationRuleType';
-import SortOrder from 'Common/Types/Database/SortOrder';
+import SortOrder from 'Common/Types/BaseDatabase/SortOrder';
 import NotificationMethodView from '../../Components/NotificationMethods/NotificationMethod';
 
 const Settings: FunctionComponent<PageComponentProps> = (
@@ -69,7 +68,7 @@ const Settings: FunctionComponent<PageComponentProps> = (
                 onBeforeCreate={(
                     model: UserNotificationRule,
                     miscDataProps: JSONObject
-                ): UserNotificationRule => {
+                ): Promise<UserNotificationRule> => {
                     model.projectId = DashboardNavigation.getProjectId()!;
                     model.userId = User.getUserId();
                     model.ruleType = options.ruleType;
@@ -123,7 +122,7 @@ const Settings: FunctionComponent<PageComponentProps> = (
                         }
                     }
 
-                    return model;
+                    return Promise.resolve(model);
                 }}
                 sortOrder={SortOrder.Ascending}
                 sortBy="notifyAfterMinutes"
@@ -136,7 +135,6 @@ const Settings: FunctionComponent<PageComponentProps> = (
                 isEditable={false}
                 isCreateable={true}
                 cardProps={{
-                    icon: IconProp.AdjustmentVertical,
                     title: options.title,
                     description: options.description,
                 }}
@@ -145,7 +143,7 @@ const Settings: FunctionComponent<PageComponentProps> = (
                 }
                 formFields={[
                     {
-                        field: {
+                        overrideField: {
                             notificationMethod: true,
                         },
                         forceShow: true,
@@ -187,7 +185,7 @@ const Settings: FunctionComponent<PageComponentProps> = (
                         },
                         title: 'Notification Method',
                         type: FieldType.Text,
-                        getElement: (item: BaseModel): ReactElement => {
+                        getElement: (item: JSONObject): ReactElement => {
                             return (
                                 <NotificationMethodView
                                     item={item}
@@ -229,7 +227,7 @@ const Settings: FunctionComponent<PageComponentProps> = (
         );
     };
 
-    const init: Function = async (): Promise<void> => {
+    const init: () => Promise<void> = async (): Promise<void> => {
         // Ping an API here.
         setError('');
         setIsLoading(true);
@@ -312,8 +310,8 @@ const Settings: FunctionComponent<PageComponentProps> = (
 
                 const option: DropdownOption = {
                     label: model.getColumnValue('phone')
-                        ? model.getColumnValue('phone')?.toString()!
-                        : model.getColumnValue('email')?.toString()!,
+                        ? (model.getColumnValue('phone')?.toString() as string)
+                        : (model.getColumnValue('email')?.toString() as string),
                     value: model.id!.toString(),
                 };
 

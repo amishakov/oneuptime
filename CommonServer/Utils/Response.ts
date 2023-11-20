@@ -16,6 +16,8 @@ import EmptyResponse from 'Common/Types/API/EmptyResponse';
 import JSONFunctions from 'Common/Types/JSONFunctions';
 import FileModel from 'Common/Models/FileModel';
 import Dictionary from 'Common/Types/Dictionary';
+import StatusCode from 'Common/Types/API/StatusCode';
+import { DEFAULT_LIMIT } from 'Common/Types/Database/LimitMax';
 
 export default class Response {
     private static logResponse(
@@ -28,27 +30,35 @@ export default class Response {
 
         const requestEndedAt: Date = new Date();
         const method: string = oneUptimeRequest.method;
-        const url: URL = URL.fromString(oneUptimeRequest.url);
+        const path: string = oneUptimeRequest.originalUrl.toString();
 
-        const header_info: string = `Response ID: ${
-            oneUptimeRequest.id
-        } -- POD NAME: ${
-            process.env['POD_NAME'] || 'NONE'
-        } -- METHOD: ${method} -- URL: ${url.toString()} -- DURATION: ${(
-            requestEndedAt.getTime() -
-            (oneUptimeRequest.requestStartedAt as Date).getTime()
-        ).toString()}ms -- STATUS: ${oneUptimeResponse.statusCode}`;
+        const logLine: JSONObject = {
+            RequestID: `${oneUptimeRequest.id}`,
 
-        const body_info: string = `Response ID: ${
-            oneUptimeRequest.id
-        } -- RESPONSE BODY: ${
-            responsebody ? JSON.stringify(responsebody, null, 2) : 'EMPTY'
-        }`;
+            PodName: `${process.env['POD_NAME'] || 'NONE'}`,
+
+            HTTPMethod: `${method}`,
+
+            Path: `${path.toString()}`,
+
+            RequestDuration: `${(
+                requestEndedAt.getTime() -
+                (oneUptimeRequest.requestStartedAt as Date).getTime()
+            ).toString()}ms`,
+
+            ResponseStatus: `${oneUptimeResponse.statusCode}`,
+
+            Host: `${oneUptimeRequest.hostname}`,
+
+            ResponseBody: `${
+                responsebody ? JSON.stringify(responsebody, null, 2) : 'EMPTY'
+            }`,
+        };
 
         if (oneUptimeResponse.statusCode > 299) {
-            logger.error(header_info + '\n ' + body_info);
+            logger.error(logLine);
         } else {
-            logger.info(header_info + '\n ' + body_info);
+            logger.info(logLine);
         }
     }
 
@@ -165,9 +175,13 @@ export default class Response {
         req: ExpressRequest,
         res: ExpressResponse,
         list: Array<BaseModel>,
-        count: PositiveNumber,
+        count: PositiveNumber | number,
         modelType: { new (): BaseModel }
     ): void {
+        if (!(count instanceof PositiveNumber)) {
+            count = new PositiveNumber(count);
+        }
+
         return this.sendJsonArrayResponse(
             req,
             res,
@@ -182,17 +196,26 @@ export default class Response {
         req: ExpressRequest,
         res: ExpressResponse,
         item: BaseModel | null,
-        modelType: { new (): BaseModel }
+        modelType: { new (): BaseModel },
+        options?:
+            | {
+                  miscData?: JSONObject;
+              }
+            | undefined
     ): void {
-        return this.sendJsonObjectResponse(
-            req,
-            res,
-            item
-                ? JSONFunctions.serialize(
-                      JSONFunctions.toJSONObject(item, modelType)
-                  )
-                : {}
-        );
+        let response: JSONObject = {};
+
+        if (item) {
+            response = JSONFunctions.serialize(
+                JSONFunctions.toJSONObject(item, modelType)
+            );
+        }
+
+        if (options?.miscData) {
+            response['_miscData'] = options.miscData;
+        }
+
+        return this.sendJsonObjectResponse(req, res, response);
     }
 
     public static redirect(
@@ -258,6 +281,8 @@ export default class Response {
             listData.limit = new PositiveNumber(
                 parseInt(oneUptimeRequest.query['limit'].toString())
             );
+        } else {
+            listData.limit = new PositiveNumber(DEFAULT_LIMIT);
         }
 
         if (oneUptimeRequest.query['output-type'] === 'csv') {
@@ -273,7 +298,10 @@ export default class Response {
     public static sendJsonObjectResponse(
         req: ExpressRequest,
         res: ExpressResponse,
-        item: JSONObject
+        item: JSONObject,
+        options?: {
+            statusCode?: StatusCode;
+        }
     ): void {
         const oneUptimeRequest: OneUptimeRequest = req as OneUptimeRequest;
         const oneUptimeResponse: OneUptimeResponse = res as OneUptimeResponse;
@@ -293,7 +321,9 @@ export default class Response {
         }
 
         oneUptimeResponse.logBody = item as JSONObject;
-        oneUptimeResponse.status(200).send(item);
+        oneUptimeResponse
+            .status(options?.statusCode ? options?.statusCode.toNumber() : 200)
+            .send(item);
         this.logResponse(req, res, item as JSONObject);
     }
 

@@ -24,9 +24,9 @@ import TenantColumn from 'Common/Types/Database/TenantColumn';
 import TableAccessControl from 'Common/Types/Database/AccessControl/TableAccessControl';
 import ColumnAccessControl from 'Common/Types/Database/AccessControl/ColumnAccessControl';
 import TableMetadata from 'Common/Types/Database/TableMetadata';
-import EnableWorkflow from 'Common/Types/Model/EnableWorkflow';
+import EnableWorkflow from 'Common/Types/Database/EnableWorkflow';
 import IconProp from 'Common/Types/Icon/IconProp';
-import EnableDocumentation from 'Common/Types/Model/EnableDocumentation';
+import EnableDocumentation from 'Common/Types/Database/EnableDocumentation';
 import TableBillingAccessControl from 'Common/Types/Database/AccessControl/TableBillingAccessControl';
 import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
 
@@ -34,7 +34,7 @@ import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
     create: PlanSelect.Growth,
     read: PlanSelect.Free,
     update: PlanSelect.Growth,
-    delete: PlanSelect.Growth,
+    delete: PlanSelect.Free,
 })
 @EnableDocumentation()
 @TableAccessControl({
@@ -47,6 +47,7 @@ import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
     read: [
         Permission.ProjectOwner,
         Permission.ProjectAdmin,
+        Permission.ProjectMember,
         Permission.CanReadProjectTeam,
     ],
     delete: [
@@ -92,6 +93,7 @@ export default class TeamPermission extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectTeam,
         ],
         update: [],
@@ -128,6 +130,7 @@ export default class TeamPermission extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectTeam,
         ],
         update: [],
@@ -158,6 +161,7 @@ export default class TeamPermission extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectTeam,
         ],
         update: [],
@@ -193,6 +197,7 @@ export default class TeamPermission extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectTeam,
         ],
         update: [],
@@ -219,6 +224,7 @@ export default class TeamPermission extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectTeam,
         ],
         update: [],
@@ -254,6 +260,7 @@ export default class TeamPermission extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectTeam,
         ],
         update: [],
@@ -280,6 +287,7 @@ export default class TeamPermission extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectTeam,
         ],
         update: [],
@@ -334,6 +342,7 @@ export default class TeamPermission extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectTeam,
         ],
         update: [
@@ -368,6 +377,7 @@ export default class TeamPermission extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectTeam,
         ],
         update: [

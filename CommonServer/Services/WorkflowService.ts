@@ -1,6 +1,7 @@
 import PostgresDatabase from '../Infrastructure/PostgresDatabase';
 import Model from 'Model/Models/Workflow';
-import DatabaseService, { OnUpdate } from './DatabaseService';
+import DatabaseService from './DatabaseService';
+import { OnUpdate } from '../Types/Database/Hooks';
 import ObjectID from 'Common/Types/ObjectID';
 import { JSONObject } from 'Common/Types/JSON';
 import {
@@ -12,7 +13,7 @@ import API from 'Common/Utils/API';
 import EmptyResponseData from 'Common/Types/API/EmptyResponse';
 import URL from 'Common/Types/API/URL';
 import Protocol from 'Common/Types/API/Protocol';
-import { WorkflowHostname } from '../Config';
+import { WorkflowHostname } from '../EnvironmentConfig';
 import Route from 'Common/Types/API/Route';
 import ClusterKeyAuthorization from '../Middleware/ClusterKeyAuthorization';
 
@@ -53,7 +54,7 @@ export class Service extends DatabaseService<Model> {
             await this.updateOneById({
                 id: new ObjectID(onUpdate.updateBy.query._id! as any),
                 data: {
-                    triggerId: trigger?.metadataId! || null,
+                    triggerId: trigger?.metadataId || null,
                     triggerArguments: trigger?.arguments || {},
                 } as any,
                 props: {

@@ -46,7 +46,7 @@ const DashboardHeader: FunctionComponent<ComponentProps> = (
     const [activeIncidentToggleRefresh, setActiveIncidentToggleRefresh] =
         useState<boolean>(true);
 
-    const refreshIncidentCount: Function = () => {
+    const refreshIncidentCount: () => void = () => {
         setActiveIncidentToggleRefresh(!activeIncidentToggleRefresh);
     };
 
@@ -100,9 +100,6 @@ const DashboardHeader: FunctionComponent<ComponentProps> = (
                                         RouteMap[PageMap.PROJECT_INVITATIONS]!
                                     );
                                 }}
-                                style={{
-                                    marginRight: '10px',
-                                }}
                             />
 
                             <HeaderModelAlert<Incident>
@@ -125,28 +122,26 @@ const DashboardHeader: FunctionComponent<ComponentProps> = (
                                         RouteMap[PageMap.ACTIVE_INCIDENTS]!
                                     );
                                 }}
-                                style={{
-                                    marginRight: '10px',
-                                }}
                             />
 
                             {props.selectedProject?.trialEndsAt &&
                                 BILLING_ENABLED &&
                                 OneUptimeDate.getNumberOfDaysBetweenDatesInclusive(
                                     OneUptimeDate.getCurrentDate(),
-                                    props.selectedProject?.trialEndsAt!
-                                ) > 0 && (
+                                    props.selectedProject?.trialEndsAt
+                                ) > 0 &&
+                                !props.selectedProject.resellerId && (
                                     <HeaderAlert
                                         icon={IconProp.Clock}
                                         className="rounded-md m-3 bg-indigo-500 p-3  ml-0"
                                         title={`Trial ends in ${OneUptimeDate.getNumberOfDaysBetweenDatesInclusive(
                                             OneUptimeDate.getCurrentDate(),
-                                            props.selectedProject?.trialEndsAt!
+                                            props.selectedProject?.trialEndsAt
                                         )} ${
                                             OneUptimeDate.getNumberOfDaysBetweenDatesInclusive(
                                                 OneUptimeDate.getCurrentDate(),
                                                 props.selectedProject
-                                                    ?.trialEndsAt!
+                                                    ?.trialEndsAt
                                             ) > 1
                                                 ? 'days'
                                                 : 'day'
@@ -180,7 +175,8 @@ const DashboardHeader: FunctionComponent<ComponentProps> = (
                             getAllEnvVars()
                         ) &&
                         props.paymentMethodsCount !== undefined &&
-                        props.paymentMethodsCount === 0 ? (
+                        props.paymentMethodsCount === 0 &&
+                        !props.selectedProject.resellerId ? (
                             <Button
                                 title="Add Card Details"
                                 onClick={() => {

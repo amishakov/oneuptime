@@ -6,23 +6,24 @@ import ModelForm, {
 } from '../Forms/ModelForm';
 import BaseModel from 'Common/Models/BaseModel';
 import ButtonType from '../Button/ButtonTypes';
-import { JSONObject, JSONObjectOrArray } from 'Common/Types/JSON';
+import { JSONObject } from 'Common/Types/JSON';
 import ObjectID from 'Common/Types/ObjectID';
 import Alert, { AlertType } from '../Alerts/Alert';
 import FormValues from '../Forms/Types/FormValues';
+import JSONFunctions from 'Common/Types/JSONFunctions';
+import ModelAPI from '../../Utils/ModelAPI/ModelAPI';
 
 export interface ComponentProps<TBaseModel extends BaseModel> {
     title: string;
-    description: string;
-    name: string;
+    description?: string | undefined;
+    modelAPI?: typeof ModelAPI | undefined;
+    name?: string | undefined;
     modelType: { new (): TBaseModel };
     initialValues?: FormValues<TBaseModel> | undefined;
     onClose?: undefined | (() => void);
     submitButtonText?: undefined | string;
     modalWidth?: ModalWidth | undefined;
-    onSuccess?:
-        | undefined
-        | ((data: TBaseModel | JSONObjectOrArray | Array<TBaseModel>) => void);
+    onSuccess?: undefined | ((data: TBaseModel) => void);
     submitButtonStyleType?: undefined | ButtonStyleType;
     formProps: ModelFormComponentProps<TBaseModel>;
     modelIdToEdit?: ObjectID | undefined;
@@ -32,7 +33,9 @@ export interface ComponentProps<TBaseModel extends BaseModel> {
     footer?: ReactElement | undefined;
 }
 
-const ModelFormModal: Function = <TBaseModel extends BaseModel>(
+const ModelFormModal: <TBaseModel extends BaseModel>(
+    props: ComponentProps<TBaseModel>
+) => ReactElement = <TBaseModel extends BaseModel>(
     props: ComponentProps<TBaseModel>
 ): ReactElement => {
     const [isFormLoading, setIsFormLoading] = useState<boolean>(false);
@@ -70,6 +73,7 @@ const ModelFormModal: Function = <TBaseModel extends BaseModel>(
                     <ModelForm<TBaseModel>
                         {...props.formProps}
                         name={props.name}
+                        modelAPI={props.modelAPI}
                         modelType={props.modelType}
                         onIsLastFormStep={(isLastFormStep: boolean) => {
                             if (isLastFormStep) {
@@ -87,13 +91,14 @@ const ModelFormModal: Function = <TBaseModel extends BaseModel>(
                             setIsFormLoading(isFormLoading);
                         }}
                         initialValues={props.initialValues}
-                        onSuccess={(
-                            data:
-                                | TBaseModel
-                                | JSONObjectOrArray
-                                | Array<TBaseModel>
-                        ) => {
-                            props.onSuccess && props.onSuccess(data);
+                        onSuccess={(data: TBaseModel) => {
+                            props.onSuccess &&
+                                props.onSuccess(
+                                    JSONFunctions.fromJSONObject(
+                                        data as TBaseModel,
+                                        props.modelType
+                                    )
+                                );
                         }}
                         onError={(error: string) => {
                             setError(error);

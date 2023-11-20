@@ -12,14 +12,19 @@ const APP_NAME: string = 'test-server';
 app.use([`/${APP_NAME}`, '/'], MainAPI);
 app.use([`/${APP_NAME}`, '/'], SettingsAPI);
 
-const init: Function = async (): Promise<void> => {
+const init: () => Promise<void> = async (): Promise<void> => {
     try {
         // init the app
         await App(APP_NAME);
     } catch (err) {
         logger.error('App Init Failed:');
         logger.error(err);
+        throw err;
     }
 };
 
-init();
+init().catch((err: Error) => {
+    logger.error(err);
+    logger.info('Exiting node process');
+    process.exit(1);
+});

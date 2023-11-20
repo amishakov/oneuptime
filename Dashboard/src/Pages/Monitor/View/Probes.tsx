@@ -1,11 +1,6 @@
 import Route from 'Common/Types/API/Route';
 import ModelPage from 'CommonUI/src/Components/Page/ModelPage';
-import React, {
-    FunctionComponent,
-    ReactElement,
-    useEffect,
-    useState,
-} from 'react';
+import React, { FunctionComponent, ReactElement, useState } from 'react';
 import PageMap from '../../../Utils/PageMap';
 import RouteMap, { RouteUtil } from '../../../Utils/RouteMap';
 import PageComponentProps from '../../PageComponentProps';
@@ -27,13 +22,15 @@ import MonitorProbe from 'Model/Models/MonitorProbe';
 import DashboardNavigation from '../../../Utils/Navigation';
 import Probe from 'Model/Models/Probe';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
-import ProbeElement from '../../../Components/Probe/Probe';
+import ProbeElement from 'CommonUI/src/Components/Probe/Probe';
 import { LIMIT_PER_PROJECT } from 'Common/Types/Database/LimitMax';
 import URL from 'Common/Types/API/URL';
 import { DASHBOARD_API_URL } from 'CommonUI/src/Config';
 import DisabledWarning from '../../../Components/Monitor/DisabledWarning';
 import { ButtonStyleType } from 'CommonUI/src/Components/Button/Button';
 import Modal, { ModalWidth } from 'CommonUI/src/Components/Modal/Modal';
+import BadDataException from 'Common/Types/Exception/BadDataException';
+import useAsyncEffect from 'use-async-effect';
 
 const MonitorProbes: FunctionComponent<PageComponentProps> = (
     _props: PageComponentProps
@@ -47,7 +44,7 @@ const MonitorProbes: FunctionComponent<PageComponentProps> = (
 
     const [probes, setProbes] = useState<Array<Probe>>([]);
 
-    const fetchItem: Function = async (): Promise<void> => {
+    const fetchItem: () => Promise<void> = async (): Promise<void> => {
         // get item.
         setIsLoading(true);
 
@@ -112,9 +109,9 @@ const MonitorProbes: FunctionComponent<PageComponentProps> = (
         undefined
     );
 
-    useEffect(() => {
+    useAsyncEffect(async () => {
         // fetch the model
-        fetchItem();
+        await fetchItem();
     }, []);
 
     const getPageContent: Function = (): ReactElement => {
@@ -129,6 +126,7 @@ const MonitorProbes: FunctionComponent<PageComponentProps> = (
         if (monitorType === MonitorType.Manual) {
             return (
                 <EmptyState
+                    id="monitoring-probes-empty-state"
                     icon={IconProp.Signal}
                     title={'No Monitoring Probes for Manual Monitors'}
                     description={
@@ -150,11 +148,11 @@ const MonitorProbes: FunctionComponent<PageComponentProps> = (
                     projectId: DashboardNavigation.getProjectId()?.toString(),
                     monitorId: modelId.toString(),
                 }}
-                onBeforeCreate={(item: MonitorProbe): MonitorProbe => {
+                onBeforeCreate={(item: MonitorProbe): Promise<MonitorProbe> => {
                     item.monitorId = modelId;
                     item.projectId = DashboardNavigation.getProjectId()!;
 
-                    return item;
+                    return Promise.resolve(item);
                 }}
                 id="probes-table"
                 name="Monitor > Monitor Probes"
@@ -162,7 +160,6 @@ const MonitorProbes: FunctionComponent<PageComponentProps> = (
                 isEditable={true}
                 isCreateable={true}
                 cardProps={{
-                    icon: IconProp.Signal,
                     title: 'Probes',
                     description:
                         'List of probes that help you monitor this resource.',
@@ -208,6 +205,12 @@ const MonitorProbes: FunctionComponent<PageComponentProps> = (
                         description: 'Which probe do you want to use?',
                         fieldType: FormFieldSchemaType.Dropdown,
                         dropdownOptions: probes.map((probe: Probe) => {
+                            if (!probe.name || !probe._id) {
+                                throw new BadDataException(
+                                    `Probe name or id is missing`
+                                );
+                            }
+
                             return {
                                 label: probe.name,
                                 value: probe._id,

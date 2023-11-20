@@ -110,8 +110,31 @@ import UserNotificationSettingService from './UserNotificationSettingService';
 import UserOnCallLogService from './UserOnCallLogService';
 import UserOnCallLogTimelineService from './UserOnCallLogTimelineService';
 import BaseService from './BaseService';
+// import LogService from './LogService';
+import AnalyticsDatabaseService from './AnalyticsDatabaseService';
+import AnalyticsBaseModel from 'Common/AnalyticsModels/BaseModel';
+
+import ResellerService from './ResellerService';
+import ResellerPlanService from './ResellerPlanService';
+
+import PromoCodeService from './PromoCodeService';
+import LogService from './LogService';
+import SpanService from './SpanService';
+import MetricSumService from './MetricSumService';
+import MetricHistogramService from './MetricHistogramService';
+import MetricGaugeService from './MetricGaugeService';
+
+import MonitorGroupService from './MonitorGroupService';
+import MonitorGroupResourceService from './MonitorGroupResourceService';
+import MonitorGroupOwnerUserService from './MonitorGroupOwnerUserService';
+import MonitorGroupOwnerTeamService from './MonitorGroupOwnerTeamService';
+import ServiceService from './ServiceService';
 
 const services: Array<BaseService> = [
+    PromoCodeService,
+
+    ResellerService,
+    ResellerPlanService,
     // Import all services in current folder here.
     AccessTokenService,
     ApiKeyPermissionService,
@@ -215,6 +238,24 @@ const services: Array<BaseService> = [
     WorkflowLogService,
     WorkflowService,
     WorkflowVariablesService,
+
+    // Monitor Group Service
+    MonitorGroupService,
+    MonitorGroupResourceService,
+    MonitorGroupOwnerUserService,
+    MonitorGroupOwnerTeamService,
+
+    ServiceService,
+];
+
+export const AnalyticsServices: Array<
+    AnalyticsDatabaseService<AnalyticsBaseModel>
+> = [
+    LogService,
+    SpanService,
+    MetricSumService,
+    MetricHistogramService,
+    MetricGaugeService,
 ];
 
 export default services;

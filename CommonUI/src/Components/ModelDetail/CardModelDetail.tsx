@@ -12,13 +12,13 @@ import Card, {
 import ModelDetail, { ComponentProps as ModeDetailProps } from './ModelDetail';
 import BaseModel from 'Common/Models/BaseModel';
 import { ButtonStyleType } from '../Button/Button';
-
 import IconProp from 'Common/Types/Icon/IconProp';
 import ModelFormModal from '../ModelFormModal/ModelFormModal';
 import { FormType } from '../Forms/ModelForm';
 import Fields from '../Forms/Types/Fields';
 import { FormStep } from '../Forms/Types/FormStep';
 import { ModalWidth } from '../Modal/Modal';
+import User from '../../Utils/User';
 
 export interface ComponentProps<TBaseModel extends BaseModel> {
     cardProps: CardProps;
@@ -33,7 +33,9 @@ export interface ComponentProps<TBaseModel extends BaseModel> {
     createEditModalWidth?: ModalWidth | undefined;
 }
 
-const CardModelDetail: Function = <TBaseModel extends BaseModel>(
+const CardModelDetail: <TBaseModel extends BaseModel>(
+    props: ComponentProps<TBaseModel>
+) => ReactElement = <TBaseModel extends BaseModel>(
     props: ComponentProps<TBaseModel>
 ): ReactElement => {
     const [cardButtons, setCardButtons] = useState<Array<CardButtonSchema>>([]);
@@ -46,18 +48,19 @@ const CardModelDetail: Function = <TBaseModel extends BaseModel>(
         const userProjectPermissions: UserTenantAccessPermission | null =
             PermissionUtil.getProjectPermissions();
 
-        const hasPermissionToEdit: boolean = Boolean(
-            userProjectPermissions &&
-                userProjectPermissions.permissions &&
-                PermissionHelper.doesPermissionsIntersect(
-                    model.updateRecordPermissions,
-                    userProjectPermissions.permissions.map(
-                        (item: UserPermission) => {
-                            return item.permission;
-                        }
+        const hasPermissionToEdit: boolean =
+            Boolean(
+                userProjectPermissions &&
+                    userProjectPermissions.permissions &&
+                    PermissionHelper.doesPermissionsIntersect(
+                        model.updateRecordPermissions,
+                        userProjectPermissions.permissions.map(
+                            (item: UserPermission) => {
+                                return item.permission;
+                            }
+                        )
                     )
-                )
-        );
+            ) || User.isMasterAdmin();
 
         let cardButtons: Array<CardButtonSchema> = [];
 
@@ -88,6 +91,9 @@ const CardModelDetail: Function = <TBaseModel extends BaseModel>(
                         {...props.modelDetailProps}
                         onItemLoaded={(item: TBaseModel) => {
                             setItem(item);
+                            if (props.modelDetailProps.onItemLoaded) {
+                                props.modelDetailProps.onItemLoaded(item);
+                            }
                         }}
                     />
                 </div>
@@ -118,7 +124,7 @@ const CardModelDetail: Function = <TBaseModel extends BaseModel>(
                         modelType: props.modelDetailProps.modelType,
                         steps: props.formSteps || [],
                     }}
-                    modelIdToEdit={item?._id}
+                    modelIdToEdit={item?.id || undefined}
                 />
             ) : (
                 <></>

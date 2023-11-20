@@ -40,6 +40,21 @@ jobs:
       - name: build docker image
         run: sudo docker build -f ./LinkShortener/Dockerfile .
 
+  docker-build-otel-collector:
+    runs-on: ubuntu-latest
+    env:
+      CI_PIPELINE_ID: ${{github.run_number}}
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v2
+
+      - name: Preinstall 
+        run: npm run prerun
+      
+      # build image for accounts service
+      - name: build docker image
+        run: sudo docker build -f ./OTelCollector/Dockerfile .
+
   docker-build-api-reference:
     runs-on: ubuntu-latest
     env:
@@ -70,6 +85,21 @@ jobs:
       # build image for accounts service
       - name: build docker image
         run: sudo docker build -f ./DashboardAPI/Dockerfile .
+
+  docker-build-admin-dashboard:
+    runs-on: ubuntu-latest
+    env:
+      CI_PIPELINE_ID: ${{github.run_number}}
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v2
+
+      - name: Preinstall 
+        run: npm run prerun
+
+      # build image for home
+      - name: build docker image
+        run: sudo docker build -f ./AdminDashboard/Dockerfile .
 
   docker-build-dashboard:
     runs-on: ubuntu-latest
@@ -116,20 +146,6 @@ jobs:
       - name: build docker image
         run: sudo docker build -f ./Haraka/Dockerfile .
 
-  docker-build-helm-chart:
-    runs-on: ubuntu-latest
-    env:
-      CI_PIPELINE_ID: ${{github.run_number}}
-    steps:
-      - name: Checkout 
-        uses: actions/checkout@v2
-
-      - name: Preinstall 
-        run: npm run prerun
-        
-      # build image for home
-      - name: build docker image
-        run: sudo docker build -f ./HelmChart/Dockerfile .
 
   docker-build-home:
     runs-on: ubuntu-latest
@@ -172,24 +188,10 @@ jobs:
       - name: Preinstall 
         run: npm run prerun
         
-      # build image for licensing
+      # build image for integrations
       - name: build docker image
         run: sudo docker build -f ./Integration/Dockerfile .
 
-  docker-build-licensing:
-    runs-on: ubuntu-latest
-    env:
-      CI_PIPELINE_ID: ${{github.run_number}}
-    steps:
-      - name: Checkout 
-        uses: actions/checkout@v2
-      
-      - name: Preinstall 
-        run: npm run prerun
-
-      # build image for licensing
-      - name: build docker image
-        run: sudo docker build -f ./Licensing/Dockerfile .
 
   docker-build-notification:
     runs-on: ubuntu-latest
@@ -222,7 +224,7 @@ jobs:
       - name: build docker image
         run: sudo docker build -f ./Probe/Dockerfile .
 
-  docker-build-probe-api:
+  docker-build-ingestor:
     runs-on: ubuntu-latest
     env:
       CI_PIPELINE_ID: ${{github.run_number}}
@@ -235,7 +237,7 @@ jobs:
         
       # build image probe api
       - name: build docker image
-        run: sudo docker build -f ./ProbeAPI/Dockerfile .
+        run: sudo docker build -f ./Ingestor/Dockerfile .
 
   docker-build-realtime:
     runs-on: ubuntu-latest

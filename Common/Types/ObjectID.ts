@@ -14,8 +14,13 @@ export default class ObjectID extends DatabaseProperty {
         this._id = v;
     }
 
-    public constructor(id: string) {
+    public constructor(id: string | ObjectID) {
         super();
+
+        if (id instanceof ObjectID) {
+            id = id.toString();
+        }
+
         this.id = id;
     }
 
@@ -62,6 +67,10 @@ export default class ObjectID extends DatabaseProperty {
         }
 
         return null;
+    }
+
+    public static getZeroObjectID(): ObjectID {
+        return new ObjectID('00000000-0000-0000-0000-000000000000');
     }
 
     public static fromString(id: string): ObjectID {

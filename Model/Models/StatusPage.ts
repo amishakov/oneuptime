@@ -23,14 +23,14 @@ import Permission from 'Common/Types/Permission';
 import ColumnAccessControl from 'Common/Types/Database/AccessControl/ColumnAccessControl';
 import TenantColumn from 'Common/Types/Database/TenantColumn';
 import TableMetadata from 'Common/Types/Database/TableMetadata';
-import EnableWorkflow from 'Common/Types/Model/EnableWorkflow';
+import EnableWorkflow from 'Common/Types/Database/EnableWorkflow';
 import IconProp from 'Common/Types/Icon/IconProp';
 import AccessControlColumn from 'Common/Types/Database/AccessControlColumn';
 import Label from './Label';
 import File from './File';
 import UniqueColumnBy from 'Common/Types/Database/UniqueColumnBy';
 import { JSONObject } from 'Common/Types/JSON';
-import EnableDocumentation from 'Common/Types/Model/EnableDocumentation';
+import EnableDocumentation from 'Common/Types/Database/EnableDocumentation';
 import ProjectSmtpConfig from './ProjectSmtpConfig';
 import ColumnBillingAccessControl from 'Common/Types/Database/AccessControl/ColumnBillingAccessControl';
 import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
@@ -880,6 +880,80 @@ export default class StatusPage extends BaseModel {
         create: PlanSelect.Free,
     })
     public isPublicStatusPage?: boolean = undefined;
+
+    @ColumnAccessControl({
+        create: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanCreateProjectStatusPage,
+        ],
+        read: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanReadProjectStatusPage,
+        ],
+        update: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanEditProjectStatusPage,
+        ],
+    })
+    @TableColumn({
+        isDefaultValueColumn: true,
+        type: TableColumnType.Boolean,
+        title: 'Show Incident Labels',
+        description: 'Show Incident Labels on Status Page?',
+    })
+    @Column({
+        type: ColumnType.Boolean,
+        default: false,
+    })
+    @ColumnBillingAccessControl({
+        read: PlanSelect.Free,
+        update: PlanSelect.Growth,
+        create: PlanSelect.Free,
+    })
+    public showIncidentLabelsOnStatusPage?: boolean = undefined;
+
+    @ColumnAccessControl({
+        create: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanCreateProjectStatusPage,
+        ],
+        read: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanReadProjectStatusPage,
+        ],
+        update: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanEditProjectStatusPage,
+        ],
+    })
+    @TableColumn({
+        isDefaultValueColumn: true,
+        type: TableColumnType.Boolean,
+        title: 'Show Scheduled Event Labels',
+        description: 'Show Scheduled Event Labels on Status Page?',
+    })
+    @Column({
+        type: ColumnType.Boolean,
+        default: false,
+    })
+    @ColumnBillingAccessControl({
+        read: PlanSelect.Free,
+        update: PlanSelect.Growth,
+        create: PlanSelect.Free,
+    })
+    public showScheduledEventLabelsOnStatusPage?: boolean = undefined;
 
     @ColumnAccessControl({
         create: [

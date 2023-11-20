@@ -9,7 +9,6 @@ import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import DropdownUtil from 'CommonUI/src/Utils/Dropdown';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
-import IconProp from 'Common/Types/Icon/IconProp';
 import DashboardNavigation from '../../../Utils/Navigation';
 import Navigation from 'CommonUI/src/Utils/Navigation';
 import StatusPageSSO from 'Model/Models/StatusPageSso';
@@ -110,13 +109,30 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                     isEditable={true}
                     isCreateable={true}
                     cardProps={{
-                        icon: IconProp.Lock,
                         title: 'Single Sign On (SSO)',
                         description:
                             'Single sign-on is an authentication scheme that allows a user to log in with a single ID to any of several related, yet independent, software systems.',
                     }}
                     noItemsMessage={'No SSO configuration found.'}
                     viewPageRoute={Navigation.getCurrentRoute()}
+                    formSteps={[
+                        {
+                            title: 'Baisc Info',
+                            id: 'basic',
+                        },
+                        {
+                            title: 'Sign On',
+                            id: 'sign-on',
+                        },
+                        {
+                            title: 'Certificate',
+                            id: 'certificate',
+                        },
+                        {
+                            title: 'More',
+                            id: 'more',
+                        },
+                    ]}
                     formFields={[
                         {
                             field: {
@@ -127,6 +143,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                             required: true,
                             description: 'Friendly name to help you remember.',
                             placeholder: 'Okta',
+                            stepId: 'basic',
                             validation: {
                                 minLength: 2,
                             },
@@ -138,6 +155,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                             title: 'Description',
                             fieldType: FormFieldSchemaType.LongText,
                             required: true,
+                            stepId: 'basic',
                             description:
                                 'Friendly description to help you remember.',
                             placeholder: 'Sign in with Okta',
@@ -156,6 +174,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                                 'Members will be forwarded here when signing in to your organization',
                             placeholder:
                                 'https://yourapp.example.com/apps/appId',
+                            stepId: 'sign-on',
                         },
                         {
                             field: {
@@ -167,6 +186,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                             fieldType: FormFieldSchemaType.URL,
                             required: true,
                             placeholder: 'https://example.com',
+                            stepId: 'sign-on',
                         },
                         {
                             field: {
@@ -177,6 +197,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                             fieldType: FormFieldSchemaType.LongText,
                             required: true,
                             placeholder: 'Paste in your x509 certificate here.',
+                            stepId: 'certificate',
                         },
                         {
                             field: {
@@ -192,6 +213,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                                 ),
                             required: true,
                             placeholder: 'RSA-SHA256',
+                            stepId: 'certificate',
                         },
                         {
                             field: {
@@ -207,6 +229,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                                 ),
                             required: true,
                             placeholder: 'SHA256',
+                            stepId: 'certificate',
                         },
                         {
                             field: {
@@ -216,6 +239,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                                 'You can test this first, before enabling it. To test, please save the config.',
                             title: 'Enabled',
                             fieldType: FormFieldSchemaType.Toggle,
+                            stepId: 'more',
                         },
                     ]}
                     showRefreshButton={true}
@@ -290,7 +314,6 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                     cardProps={{
                         title: 'SSO Settings',
                         description: 'Configure settings for SSO.',
-                        icon: IconProp.Lock,
                     }}
                     isEditable={true}
                     formFields={[

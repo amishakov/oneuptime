@@ -1,4 +1,4 @@
-import React, { FunctionComponent } from 'react';
+import React, { useState } from 'react';
 import ModelForm, { FormType } from 'CommonUI/src/Components/Forms/ModelForm';
 import User from 'Model/Models/User';
 import Link from 'CommonUI/src/Components/Link/Link';
@@ -13,13 +13,84 @@ import { BILLING_ENABLED, DASHBOARD_URL } from 'CommonUI/src/Config';
 import URL from 'Common/Types/API/URL';
 import { SIGNUP_API_URL } from '../Utils/ApiPaths';
 import Fields from 'CommonUI/src/Components/Forms/Types/Fields';
+import Dictionary from 'Common/Types/Dictionary';
+import UiAnalytics from 'CommonUI/src/Utils/Analytics';
+import LocalStorage from 'CommonUI/src/Utils/LocalStorage';
+import Reseller from 'Model/Models/Reseller';
+import ModelAPI, { ListResult } from 'CommonUI/src/Utils/ModelAPI/ModelAPI';
+import BaseAPI from 'CommonUI/src/Utils/API/API';
+import ErrorMessage from 'CommonUI/src/Components/ErrorMessage/ErrorMessage';
+import PageLoader from 'CommonUI/src/Components/Loader/PageLoader';
+import useAsyncEffect from 'use-async-effect';
 
-const RegisterPage: FunctionComponent = () => {
+const RegisterPage: () => JSX.Element = () => {
     const apiUrl: URL = SIGNUP_API_URL;
+
+    const [initialValues, setInitialValues] = React.useState<JSONObject>({});
+
+    const [error, setError] = useState<string>('');
+
+    const [isLoading, setIsLoading] = React.useState<boolean>(false);
+
+    const [reseller, setResller] = React.useState<Reseller | undefined>(
+        undefined
+    );
 
     if (UserUtil.isLoggedIn()) {
         Navigation.navigate(DASHBOARD_URL);
     }
+
+    const fetchReseller: Function = async (
+        resellerId: string
+    ): Promise<void> => {
+        setIsLoading(true);
+
+        try {
+            const reseller: ListResult<Reseller> =
+                await ModelAPI.getList<Reseller>(
+                    Reseller,
+                    {
+                        resellerId: resellerId,
+                    },
+                    1,
+                    0,
+                    {
+                        hidePhoneNumberOnSignup: true,
+                    },
+                    {},
+                    {}
+                );
+
+            if (reseller.data.length > 0) {
+                setResller(reseller.data[0]);
+            }
+        } catch (err) {
+            setError(BaseAPI.getFriendlyMessage(err));
+        }
+
+        setIsLoading(false);
+    };
+
+    useAsyncEffect(async () => {
+        // if promo code is found, please save it in localstorage.
+        if (Navigation.getQueryStringByName('promoCode')) {
+            LocalStorage.setItem(
+                'promoCode',
+                Navigation.getQueryStringByName('promoCode')
+            );
+        }
+
+        if (Navigation.getQueryStringByName('email')) {
+            setInitialValues({
+                email: Navigation.getQueryStringByName('email'),
+            });
+        }
+
+        // if promo code is found, please save it in localstorage.
+        if (Navigation.getQueryStringByName('partnerId')) {
+            await fetchReseller(Navigation.getQueryStringByName('partnerId')!);
+        }
+    }, []);
 
     let formFields: Fields<User> = [
         {
@@ -29,6 +100,7 @@ const RegisterPage: FunctionComponent = () => {
             fieldType: FormFieldSchemaType.Email,
             placeholder: 'jeff@example.com',
             required: true,
+            disabled: Boolean(initialValues && initialValues['email']),
             title: 'Email',
         },
         {
@@ -53,7 +125,11 @@ const RegisterPage: FunctionComponent = () => {
                 required: true,
                 title: 'Company Name',
             },
-            {
+        ]);
+
+        // If reseller wants to hide phone number on sign up, we hide it.
+        if (!reseller || !reseller.hidePhoneNumberOnSignup) {
+            formFields.push({
                 field: {
                     companyPhoneNumber: true,
                 },
@@ -61,8 +137,8 @@ const RegisterPage: FunctionComponent = () => {
                 required: true,
                 placeholder: '+11234567890',
                 title: 'Phone Number',
-            },
-        ]);
+            });
+        }
     }
 
     formFields = formFields.concat([
@@ -95,13 +171,21 @@ const RegisterPage: FunctionComponent = () => {
         },
     ]);
 
+    if (error) {
+        return <ErrorMessage error={error} />;
+    }
+
+    if (isLoading) {
+        return <PageLoader isVisible={true} />;
+    }
+
     return (
         <div className="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
                 <img
                     className="mx-auto h-12 w-auto"
                     src={OneUptimeLogo}
-                    alt="Your Company"
+                    alt="OneUptime"
                 />
                 <h2 className="mt-6 text-center text-2xl  tracking-tight text-gray-900">
                     Create your OneUptime account
@@ -120,23 +204,48 @@ const RegisterPage: FunctionComponent = () => {
                     <ModelForm<User>
                         modelType={User}
                         id="register-form"
-                        showAsColumns={2}
+                        showAsColumns={reseller ? 1 : 2}
                         name="Register"
+                        initialValues={initialValues}
                         maxPrimaryButtonWidth={true}
-                        initialValues={{
-                            email: '',
-                            name: '',
-                            companyName: '',
-                            companyPhoneNumber: '',
-                            password: '',
-                            confirmPassword: '',
-                        }}
                         fields={formFields}
                         apiUrl={apiUrl}
+                        onBeforeCreate={(item: User): Promise<User> => {
+                            const utmParams: Dictionary<string> =
+                                UserUtil.getUtmParams();
+
+                            if (
+                                utmParams &&
+                                Object.keys(utmParams).length > 0
+                            ) {
+                                item.utmSource = utmParams['utmSource'] || '';
+                                item.utmMedium = utmParams['utmMedium'] || '';
+                                item.utmCampaign =
+                                    utmParams['utmCampaign'] || '';
+                                item.utmTerm = utmParams['utmTerm'] || '';
+                                item.utmContent = utmParams['utmContent'] || '';
+                                item.utmUrl = utmParams['utmUrl'] || '';
+
+                                UiAnalytics.capture('utm_event', utmParams);
+                            }
+
+                            return Promise.resolve(item);
+                        }}
                         formType={FormType.Create}
                         submitButtonText={'Sign Up'}
-                        onSuccess={(value: JSONObject) => {
-                            LoginUtil.login(value);
+                        onSuccess={(
+                            value: User,
+                            miscData: JSONObject | undefined
+                        ) => {
+                            if (value && value.email) {
+                                UiAnalytics.userAuth(value.email);
+                                UiAnalytics.capture('accounts/register');
+                            }
+
+                            LoginUtil.login({
+                                user: value,
+                                token: miscData ? miscData['token'] : undefined,
+                            });
                         }}
                     />
                 </div>

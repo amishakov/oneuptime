@@ -14,13 +14,12 @@ import ModelTable, {
 } from 'CommonUI/src/Components/ModelTable/ModelTable';
 import DashboardNavigation from '../../../Utils/Navigation';
 import BadDataException from 'Common/Types/Exception/BadDataException';
-import IconProp from 'Common/Types/Icon/IconProp';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import Team from 'Model/Models/Team';
 import ProjectUser from '../../../Utils/ProjectUser';
 import CardModelDetail from 'CommonUI/src/Components/ModelDetail/CardModelDetail';
-import SortOrder from 'Common/Types/Database/SortOrder';
+import SortOrder from 'Common/Types/BaseDatabase/SortOrder';
 import { JSONObject } from 'Common/Types/JSON';
 import TeamView from '../../../Components/OnCallPolicy/EscalationRule/TeamView';
 import UserView from '../../../Components/OnCallPolicy/EscalationRule/UserView';
@@ -101,7 +100,6 @@ const OnCallPolicyDelete: FunctionComponent<PageComponentProps> = (
                     return Promise.resolve(item);
                 }}
                 cardProps={{
-                    icon: IconProp.BarsArrowDown,
                     title: 'Escalation Rules',
                     description:
                         'Escalation rules are used to determine who to contact and when to contact them when an incident is triggered.',
@@ -147,7 +145,7 @@ const OnCallPolicyDelete: FunctionComponent<PageComponentProps> = (
                             'The description of the escalation rule. This is used to describe the rule.',
                     },
                     {
-                        field: {
+                        overrideField: {
                             teams: true,
                         },
                         forceShow: true,
@@ -166,7 +164,7 @@ const OnCallPolicyDelete: FunctionComponent<PageComponentProps> = (
                         overrideFieldKey: 'teams',
                     },
                     {
-                        field: {
+                        overrideField: {
                             users: true,
                         },
                         forceShow: true,
@@ -191,7 +189,7 @@ const OnCallPolicyDelete: FunctionComponent<PageComponentProps> = (
                         stepId: 'escalation',
                         title: 'Escalate after (in minutes)',
                         fieldType: FormFieldSchemaType.Number,
-                        placeholder: 30,
+                        placeholder: '30',
                         required: true,
                         description:
                             'The amount of time to wait before escalating to the next escalation rule.',
@@ -283,7 +281,6 @@ const OnCallPolicyDelete: FunctionComponent<PageComponentProps> = (
                     title: 'Repeat Policy',
                     description:
                         'Repeat policies are used to determine how often an on-call policy should be repeated.',
-                    icon: IconProp.Call,
                 }}
                 isEditable={true}
                 formFields={[
@@ -309,7 +306,7 @@ const OnCallPolicyDelete: FunctionComponent<PageComponentProps> = (
                         required: false,
                         description:
                             'The number of times to repeat the on-call policy if no one acknowledges the incident.',
-                        placeholder: 3,
+                        placeholder: '3',
                     },
                 ]}
                 modelDetailProps={{

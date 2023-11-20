@@ -19,6 +19,7 @@ import { SMSMessage } from 'Common/Types/SMS/SMS';
 import { CallRequestMessage } from 'Common/Types/Call/CallRequest';
 import UserNotificationSettingService from 'CommonServer/Services/UserNotificationSettingService';
 import NotificationSettingEventType from 'Common/Types/NotificationSetting/NotificationSettingEventType';
+import Monitor from 'Model/Models/Monitor';
 
 RunCron(
     'IncidentOwner:SendsNotePostedEmail',
@@ -116,6 +117,9 @@ RunCron(
                         incidentSeverity: {
                             name: true,
                         },
+                        monitors: {
+                            name: true,
+                        },
                     },
                 }
             );
@@ -152,10 +156,18 @@ RunCron(
                 note: Markdown.convertToHTML(
                     (note.getColumnValue('note')! as string) || ''
                 ),
+                resourcesAffected:
+                    incident
+                        .monitors!.map((monitor: Monitor) => {
+                            return monitor.name!;
+                        })
+                        .join(', ') || 'None',
                 incidentSeverity: incident.incidentSeverity!.name!,
-                incidentViewLink: IncidentService.getIncidentLinkInDashboard(
-                    incident.projectId!,
-                    incident.id!
+                incidentViewLink: (
+                    await IncidentService.getIncidentLinkInDashboard(
+                        incident.projectId!,
+                        incident.id!
+                    )
                 ).toString(),
             };
 

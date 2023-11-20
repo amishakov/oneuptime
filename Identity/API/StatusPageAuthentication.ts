@@ -1,9 +1,5 @@
-import {
-    HttpProtocol,
-    EncryptionSecret,
-    Domain,
-    FileRoute,
-} from 'CommonServer/Config';
+import { EncryptionSecret } from 'CommonServer/EnvironmentConfig';
+import { FileRoute } from 'Common/ServiceRoute';
 import Express, {
     ExpressRequest,
     ExpressResponse,
@@ -26,8 +22,40 @@ import JSONFunctions from 'Common/Types/JSONFunctions';
 import StatusPagePrivateUser from 'Model/Models/StatusPagePrivateUser';
 import StatusPage from 'Model/Models/StatusPage';
 import StatusPageService from 'CommonServer/Services/StatusPageService';
+import Protocol from 'Common/Types/API/Protocol';
+import Hostname from 'Common/Types/API/Hostname';
+import DatabaseConfig from 'CommonServer/DatabaseConfig';
+import CookieUtil from 'CommonServer/Utils/Cookie';
 
 const router: ExpressRouter = Express.getRouter();
+
+router.post(
+    '/logout/:statuspageid',
+    async (
+        req: ExpressRequest,
+        res: ExpressResponse,
+        next: NextFunction
+    ): Promise<void> => {
+        try {
+            if (!req.params['statuspageid']) {
+                throw new BadDataException('Status Page ID is required.');
+            }
+
+            const statusPageId: ObjectID = new ObjectID(
+                req.params['statuspageid'].toString()
+            );
+
+            CookieUtil.removeCookie(
+                res,
+                CookieUtil.getUserTokenKey(statusPageId)
+            ); // remove the cookie.
+
+            return Response.sendEmptyResponse(req, res);
+        } catch (err) {
+            return next(err);
+        }
+    }
+);
 
 router.post(
     '/forgot-password',
@@ -38,6 +66,10 @@ router.post(
     ): Promise<void> => {
         try {
             const data: JSONObject = req.body['data'];
+
+            if (!data['email']) {
+                throw new BadDataException('Email is required.');
+            }
 
             const user: StatusPagePrivateUser = JSONFunctions.fromJSON(
                 data as JSONObject,
@@ -112,6 +144,10 @@ router.post(
                     },
                 });
 
+                const host: Hostname = await DatabaseConfig.getHost();
+                const httpProtocol: Protocol =
+                    await DatabaseConfig.getHttpProtocol();
+
                 MailService.sendMail(
                     {
                         toEmail: user.email!,
@@ -121,7 +157,7 @@ router.post(
                         vars: {
                             statusPageName: statusPageName!,
                             logoUrl: statusPage.logoFileId
-                                ? new URL(HttpProtocol, Domain)
+                                ? new URL(httpProtocol, host)
                                       .addRoute(FileRoute)
                                       .addRoute(
                                           '/image/' + statusPage.logoFileId
@@ -161,7 +197,13 @@ router.post(
         next: NextFunction
     ): Promise<void> => {
         try {
-            const data: JSONObject = req.body['data'];
+            const data: JSONObject = JSONFunctions.deserialize(
+                req.body['data']
+            );
+
+            if (!data['statusPageId']) {
+                throw new BadDataException('Status Page ID is required.');
+            }
 
             const user: StatusPagePrivateUser = JSONFunctions.fromJSON(
                 data as JSONObject,
@@ -173,6 +215,9 @@ router.post(
             const alreadySavedUser: StatusPagePrivateUser | null =
                 await StatusPagePrivateUserService.findOneBy({
                     query: {
+                        statusPageId: new ObjectID(
+                            data['statusPageId'].toString()
+                        ),
                         resetPasswordToken:
                             (user.resetPasswordToken as string) || '',
                     },
@@ -204,7 +249,7 @@ router.post(
 
             const statusPage: StatusPage | null =
                 await StatusPageService.findOneById({
-                    id: new ObjectID(data['statusPageId'] as string),
+                    id: new ObjectID(data['statusPageId'].toString()),
                     props: {
                         isRoot: true,
                         ignoreHooks: true,
@@ -247,6 +292,10 @@ router.post(
                 },
             });
 
+            const host: Hostname = await DatabaseConfig.getHost();
+            const httpProtocol: Protocol =
+                await DatabaseConfig.getHttpProtocol();
+
             MailService.sendMail(
                 {
                     toEmail: alreadySavedUser.email!,
@@ -256,7 +305,7 @@ router.post(
                         homeURL: statusPageURL,
                         statusPageName: statusPageName || '',
                         logoUrl: statusPage.logoFileId
-                            ? new URL(HttpProtocol, Domain)
+                            ? new URL(httpProtocol, host)
                                   .addRoute(FileRoute)
                                   .addRoute('/image/' + statusPage.logoFileId)
                                   .toString()
@@ -322,7 +371,11 @@ router.post(
 
             const alreadySavedUser: StatusPagePrivateUser | null =
                 await StatusPagePrivateUserService.findOneBy({
-                    query: { email: user.email!, password: user.password! },
+                    query: {
+                        email: user.email!,
+                        password: user.password!,
+                        statusPageId: user.statusPageId!,
+                    },
                     select: {
                         _id: true,
                         password: true,
@@ -340,13 +393,29 @@ router.post(
                     OneUptimeDate.getSecondsInDays(new PositiveNumber(30))
                 );
 
-                return Response.sendJsonObjectResponse(req, res, {
-                    token: token,
-                    user: JSONFunctions.toJSON(
-                        alreadySavedUser,
-                        StatusPagePrivateUser
-                    ),
-                });
+                CookieUtil.setCookie(
+                    res,
+                    CookieUtil.getUserTokenKey(alreadySavedUser.statusPageId!),
+                    token,
+                    {
+                        httpOnly: true,
+                        maxAge: OneUptimeDate.getMillisecondsInDays(
+                            new PositiveNumber(30)
+                        ),
+                    }
+                );
+
+                return Response.sendEntityResponse(
+                    req,
+                    res,
+                    alreadySavedUser,
+                    StatusPagePrivateUser,
+                    {
+                        miscData: {
+                            token: token,
+                        },
+                    }
+                );
             }
             throw new BadDataException(
                 'Invalid login: Email or password does not match.'

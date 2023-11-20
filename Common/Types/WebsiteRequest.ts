@@ -3,6 +3,7 @@ import Headers from './API/Headers';
 import URL from './API/URL';
 import HTML from './Html';
 import HTTPMethod from './API/HTTPMethod';
+import Dictionary from './Dictionary';
 
 export interface WebsiteResponse {
     url: URL;
@@ -36,16 +37,27 @@ export default class WebsiteRequest {
         }
 
         // use axios to fetch an HTML page
-        const response: AxiosResponse = await axios(
-            url.toString(),
-            axiosOptions
-        );
+        let response: AxiosResponse | null = null;
+
+        try {
+            response = await axios(url.toString(), axiosOptions);
+        } catch (err: unknown) {
+            if (err && options.isHeadRequest) {
+                // 404 because of HEAD request. Retry with GET request.
+                response = await axios(url.toString(), {
+                    ...axiosOptions,
+                    method: HTTPMethod.GET,
+                });
+            } else {
+                throw err;
+            }
+        }
 
         // return the response
         return {
             url: url,
             requestHeaders: options.headers || {},
-            responseHeaders: response.headers,
+            responseHeaders: response.headers as Dictionary<string>,
             responseStatusCode: response.status,
             responseBody: new HTML(response.data),
             isOnline: true,

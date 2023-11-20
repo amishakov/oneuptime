@@ -4,7 +4,7 @@ import OneUptimeDate from './Date';
 import BaseModel from '../Models/BaseModel';
 import { JSONArray, JSONObject, JSONValue, ObjectType } from './JSON';
 import { TableColumnMetadata } from '../Types/Database/TableColumn';
-import TableColumnType from '../Types/Database/TableColumnType';
+import TableColumnType from './Database/TableColumnType';
 import SerializableObject from './SerializableObject';
 import SerializableObjectDictionary from './SerializableObjectDictionary';
 import JSON5 from 'json5';
@@ -102,9 +102,13 @@ export default class JSONFunctions {
     }
 
     private static _fromJSON<T extends BaseModel>(
-        json: JSONObject,
+        json: JSONObject | T,
         type: { new (): T }
     ): T {
+        if (json instanceof BaseModel) {
+            return json;
+        }
+
         json = JSONFunctions.deserialize(json);
         const baseModel: T = new type();
 
@@ -180,7 +184,7 @@ export default class JSONFunctions {
     }
 
     public static fromJSONArray<T extends BaseModel>(
-        json: Array<JSONObject>,
+        json: Array<JSONObject | T>,
         type: { new (): T }
     ): Array<T> {
         const arr: Array<T> = [];
@@ -380,5 +384,9 @@ export default class JSONFunctions {
         }
 
         return newVal;
+    }
+
+    public static anyObjectToJSONObject(val: any): JSONObject {
+        return JSON.parse(JSON.stringify(val));
     }
 }

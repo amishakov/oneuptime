@@ -6,7 +6,7 @@ import ShortcutKey from '../ShortcutKey/ShortcutKey';
 
 export interface CardButtonSchema {
     title: string;
-    buttonStyle: ButtonStyleType;
+    buttonStyle?: ButtonStyleType | undefined;
     onClick: () => void;
     disabled?: boolean | undefined;
     icon: IconProp;
@@ -36,12 +36,16 @@ const Card: FunctionComponent<ComponentProps> = (
                         <div className="flex justify-between">
                             <div>
                                 <h2
-                                    id="payment-details-heading"
+                                    data-testid="card-details-heading"
+                                    id="card-details-heading"
                                     className="text-lg font-medium leading-6 text-gray-900"
                                 >
                                     {props.title}
                                 </h2>
-                                <p className="mt-1 text-sm text-gray-500">
+                                <p
+                                    data-testid="card-description"
+                                    className="mt-1 text-sm text-gray-500"
+                                >
                                     {props.description}
                                 </p>
                             </div>
@@ -78,6 +82,7 @@ const Card: FunctionComponent<ComponentProps> = (
                                                     shortcutKey={
                                                         button.shortcutKey
                                                     }
+                                                    dataTestId="card-button"
                                                 />
                                             </div>
                                         );

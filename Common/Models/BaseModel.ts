@@ -28,17 +28,15 @@ import Permission, {
     UserPermission,
     UserTenantAccessPermission,
 } from '../Types/Permission';
-import {
-    ColumnAccessControl,
-    ColumnBillingAccessControl,
-} from '../Types/Database/AccessControl/AccessControl';
+import { ColumnAccessControl } from '../Types/BaseDatabase/AccessControl';
 import { getColumnAccessControlForAllColumns } from '../Types/Database/AccessControl/ColumnAccessControl';
 import BadDataException from '../Types/Exception/BadDataException';
 import { PlanSelect } from '../Types/Billing/SubscriptionPlan';
-import { EnableWorkflowOn } from '../Types/Model/EnableWorkflow';
+import EnableWorkflowOn from '../Types/BaseDatabase/EnableWorkflowOn';
 import IconProp from '../Types/Icon/IconProp';
 import Text from '../Types/Text';
 import { getColumnBillingAccessControlForAllColumns } from '../Types/Database/AccessControl/ColumnBillingAccessControl';
+import ColumnBillingAccessControl from '../Types/BaseDatabase/ColumnBillingAccessControl';
 
 export type DbTypes =
     | string
@@ -110,6 +108,7 @@ export default class BaseModel extends BaseEntity {
     public enableWorkflowOn!: EnableWorkflowOn;
 
     public enableDocumentation!: boolean;
+    public isMasterAdminApiDocs!: boolean;
 
     public currentUserCanAccessColumnBy!: string | null;
     public labelsColumn!: string | null;
@@ -252,6 +251,10 @@ export default class BaseModel extends BaseEntity {
 
     public setValue<T extends DbTypes>(columnName: string, value: T): void {
         (this as any)[columnName] = value;
+    }
+
+    public removeValue(columnName: string): void {
+        (this as any)[columnName] = undefined;
     }
 
     public doesPermissionHaveConditions(

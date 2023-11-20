@@ -1,60 +1,72 @@
 upstream accounts {
-    server accounts:3003 weight=10 max_fails=3 fail_timeout=30s;
+    server ${SERVER_ACCOUNTS_HOSTNAME}:${ACCOUNTS_PORT} weight=10 max_fails=3 fail_timeout=30s;
 }
 
 upstream identity {
-    server identity:3087 weight=10 max_fails=3 fail_timeout=30s; 
+    server ${SERVER_IDENTITY_HOSTNAME}:${IDENTITY_PORT} weight=10 max_fails=3 fail_timeout=30s; 
 }
 
 upstream file {
-    server file:3125 weight=10 max_fails=3 fail_timeout=30s; 
+    server ${SERVER_FILE_HOSTNAME}:${FILE_PORT} weight=10 max_fails=3 fail_timeout=30s; 
 }
 
 upstream dashboard-api {
-    server dashboard-api:3002 weight=10 max_fails=3 fail_timeout=30s; 
+    server ${SERVER_DASHBOARD_API_HOSTNAME}:${DASHBOARD_API_PORT} weight=10 max_fails=3 fail_timeout=30s; 
 }
 
 upstream workflow {
-    server workflow:3099 weight=10 max_fails=3 fail_timeout=30s; 
+    server ${SERVER_WORKFLOW_HOSTNAME}:${WORKFLOW_PORT} weight=10 max_fails=3 fail_timeout=30s; 
 }
 
 
 upstream link-shortener {
-    server link-shortener:3521 weight=10 max_fails=3 fail_timeout=30s; 
+    server ${SERVER_LINK_SHORTENER_HOSTNAME}:${LINK_SHORTENER_PORT} weight=10 max_fails=3 fail_timeout=30s; 
 }
 
 
 upstream api-reference {
-    server api-reference:1445 weight=10 max_fails=3 fail_timeout=30s; 
+    server ${SERVER_API_REFERENCE_HOSTNAME}:${API_REFERENCE_PORT} weight=10 max_fails=3 fail_timeout=30s; 
 }
 
-upstream probe-api {
-    server probe-api:3400 weight=10 max_fails=3 fail_timeout=30s; 
+upstream ingestor {
+    server ${SERVER_INGESTOR_HOSTNAME}:${INGESTOR_PORT} weight=10 max_fails=3 fail_timeout=30s; 
 }
 
 upstream dashboard {
-    server dashboard:3009 weight=10 max_fails=3 fail_timeout=30s;
+    server ${SERVER_DASHBOARD_HOSTNAME}:${DASHBOARD_PORT} weight=10 max_fails=3 fail_timeout=30s;
+}
+
+upstream admin-dashboard {
+    server ${SERVER_ADMIN_DASHBOARD_HOSTNAME}:${ADMIN_DASHBOARD_PORT} weight=10 max_fails=3 fail_timeout=30s;
 }
 
 upstream status-page {
-    server status-page:3105 weight=10 max_fails=3 fail_timeout=30s;
+    server ${SERVER_STATUS_PAGE_HOSTNAME}:${STATUS_PAGE_PORT} weight=10 max_fails=3 fail_timeout=30s;
 }
 
 upstream home {
-    server home:1444 weight=10 max_fails=3 fail_timeout=30s;
+    server ${SERVER_HOME_HOSTNAME}:${HOME_PORT} weight=10 max_fails=3 fail_timeout=30s;
 }
 
 upstream workers {
-    server workers:3452 weight=10 max_fails=3 fail_timeout=30s;
+    server ${SERVER_WORKERS_HOSTNAME}:${WORKERS_PORT} weight=10 max_fails=3 fail_timeout=30s;
 }
 
 upstream notification {
-    server notification:3191 weight=10 max_fails=3 fail_timeout=30s;
+    server ${SERVER_NOTIFICATION_HOSTNAME}:${NOTIFICATION_PORT} weight=10 max_fails=3 fail_timeout=30s;
 }
 
+upstream otel-collector {
+    server ${OTEL_COLLECTOR_HOSTNAME}:${OTEL_COLLECTOR_PORT} weight=10 max_fails=3 fail_timeout=30s;
+}
 
 server {
 
+    gzip on;
+    gzip_types      text/plain application/xml text/html application/javascript text/javascript text/css application/json;
+    gzip_proxied    no-cache no-store private expired auth;
+    gzip_min_length 1000;
+   
     listen 80 default_server;
 
     server_name  _; # All domains. 
@@ -66,6 +78,7 @@ server {
     fastcgi_buffers  16 16k;
     fastcgi_buffer_size  32k;
 
+
     location / {
        return 301 https://$host$request_uri;
     }
@@ -74,7 +87,7 @@ server {
        return 301 https://$host$request_uri;
     }
 
-    location /status-page-api {
+    location /status-page-api/ {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -85,7 +98,35 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 
-        proxy_pass http://dashboard-api/api/status-page/status-page-api;
+        proxy_pass http://dashboard-api/api/status-page/;
+    }
+
+    location /status-page-sso-api/ {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme; 
+
+        # enable WebSockets (for ws://sockjs not connected error in the accounts source: https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_pass http://identity/status-page-sso/;
+    }
+
+    location /status-page-identity-api/ {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme; 
+
+        # enable WebSockets (for ws://sockjs not connected error in the accounts source: https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_pass http://identity/status-page/;
     }
 
     # Acme Verification.
@@ -106,6 +147,11 @@ server {
 }
 
 server {
+
+    gzip on;
+    gzip_types      text/plain application/xml text/html application/javascript text/javascript text/css application/json;
+    gzip_proxied    no-cache no-store private expired auth;
+    gzip_min_length 1000;
 
     listen 443 default_server ssl; # Port HTTPS
 
@@ -139,6 +185,48 @@ server {
         
     }
 
+    location /status-page-api/ {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme; 
+
+        # enable WebSockets (for ws://sockjs not connected error in the accounts source: https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_pass http://dashboard-api/api/status-page/;
+    }
+
+    location /status-page-sso-api/ {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme; 
+
+        # enable WebSockets (for ws://sockjs not connected error in the accounts source: https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_pass http://identity/status-page-sso/;
+    }
+
+    location /status-page-identity-api/ {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme; 
+
+        # enable WebSockets (for ws://sockjs not connected error in the accounts source: https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_pass http://identity/status-page/;
+    }
+
     location /status-page {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -155,10 +243,15 @@ server {
 }
 
 server {
+
+    gzip on;
+    gzip_types      text/plain application/xml text/html application/javascript text/javascript text/css application/json;
+    gzip_proxied    no-cache no-store private expired auth;
+    gzip_min_length 1000;
     
     listen 80;
 
-    server_name localhost ${DOMAIN}; #All domains
+    server_name localhost ${HOST}; #All domains
 
     proxy_busy_buffers_size   512k;
     proxy_buffers   4 512k;
@@ -167,7 +260,10 @@ server {
     fastcgi_buffers  16 16k;
     fastcgi_buffer_size  32k;
 
+    set $billing_enabled ${BILLING_ENABLED};
+
     location / {
+
         proxy_set_header Host $server_name;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -177,8 +273,60 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_pass http://home;
+        
+        # If billing_enabled is true then proxy to home otherwise to dashboard because we dont need marketing paages for on-prem install.
+        if ($billing_enabled = true) {
+            proxy_pass http://home;
+        }
+
+        if ($billing_enabled != true) {
+            proxy_pass http://dashboard;
+        }
     }
+
+
+    location /status-page-api/ {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme; 
+
+        # enable WebSockets (for ws://sockjs not connected error in the accounts source: https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_pass http://dashboard-api/api/status-page/;
+    }
+
+    location /status-page-sso-api/ {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme; 
+
+        # enable WebSockets (for ws://sockjs not connected error in the accounts source: https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_pass http://identity/status-page-sso/;
+    }
+
+    location /status-page-identity-api/ {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme; 
+
+        # enable WebSockets (for ws://sockjs not connected error in the accounts source: https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_pass http://identity/status-page/;
+    }
+    
 
     location /accounts {
         proxy_set_header Host $host;
@@ -191,6 +339,19 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_pass http://accounts;
+    }
+
+    location /otel-collector {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme; 
+
+        # enable WebSockets (for ws://sockjs not connected error in the accounts source: https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_pass http://otel-collector;
     }
 
     location /notification {
@@ -206,7 +367,7 @@ server {
         proxy_pass http://notification;
     }
 
-    location /probe-api {
+    location /ingestor {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -216,7 +377,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_pass http://probe-api;
+        proxy_pass http://ingestor;
 
         client_max_body_size 50M;
     }
@@ -234,6 +395,20 @@ server {
         proxy_pass http://dashboard;
     }
 
+
+    location /admin {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme; 
+
+        # enable WebSockets (for ws://sockjs not connected error in the accounts source: https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_pass http://admin-dashboard;
+    }
+
     location /status-page {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -244,6 +419,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+
         proxy_pass http://status-page;
     }
 
@@ -314,7 +490,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_pass http://probe-api/incoming-request;
+        proxy_pass http://ingestor/incoming-request;
 
         client_max_body_size 50M;
     }
@@ -335,7 +511,7 @@ server {
         client_max_body_size 50M;
     }
 
-    location /l { # Short URL for Link Shortener
+    location /l/ { # Short URL for Link Shortener
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -345,7 +521,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_pass http://link-shortener;
+        proxy_pass http://link-shortener/;
 
         client_max_body_size 50M;
     }

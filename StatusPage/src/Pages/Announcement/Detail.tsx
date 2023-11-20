@@ -8,15 +8,14 @@ import PageComponentProps from '../PageComponentProps';
 import Page from '../../Components/Page/Page';
 import URL from 'Common/Types/API/URL';
 import PageLoader from 'CommonUI/src/Components/Loader/PageLoader';
-import BaseAPI from 'CommonUI/src/Utils/API/API';
-import { DASHBOARD_API_URL } from 'CommonUI/src/Config';
+
+import { STATUS_PAGE_API_URL } from '../../Utils/Config';
 import useAsyncEffect from 'use-async-effect';
 import { JSONArray, JSONObject } from 'Common/Types/JSON';
 import ErrorMessage from 'CommonUI/src/Components/ErrorMessage/ErrorMessage';
 import BadDataException from 'Common/Types/Exception/BadDataException';
 import LocalStorage from 'CommonUI/src/Utils/LocalStorage';
 import ObjectID from 'Common/Types/ObjectID';
-import StatusPageResource from 'Model/Models/StatusPageResource';
 import RouteMap, { RouteUtil } from '../../Utils/RouteMap';
 import PageMap from '../../Utils/PageMap';
 import Route from 'Common/Types/API/Route';
@@ -69,9 +68,6 @@ const Overview: FunctionComponent<PageComponentProps> = (
 ): ReactElement => {
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [_statusPageResources, setStatusPageResources] = useState<
-        Array<StatusPageResource>
-    >([]);
     const [announcement, setAnnouncement] =
         useState<StatusPageAnnouncement | null>(null);
     const [parsedData, setParsedData] =
@@ -98,13 +94,17 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 Navigation.getLastParamAsObjectID().toString();
 
             const response: HTTPResponse<JSONObject> =
-                await BaseAPI.post<JSONObject>(
-                    URL.fromString(DASHBOARD_API_URL.toString()).addRoute(
-                        `/status-page/announcements/${id.toString()}/${announcementId}`
+                await API.post<JSONObject>(
+                    URL.fromString(STATUS_PAGE_API_URL.toString()).addRoute(
+                        `/announcements/${id.toString()}/${announcementId}`
                     ),
                     {},
                     API.getDefaultHeaders(StatusPageUtil.getStatusPageId()!)
                 );
+
+            if (!response.isSuccess()) {
+                throw response;
+            }
             const data: JSONObject = response.data;
 
             const rawAnnouncements: JSONArray =
@@ -116,25 +116,18 @@ const Overview: FunctionComponent<PageComponentProps> = (
                     StatusPageAnnouncement
                 );
 
-            const statusPageResources: Array<StatusPageResource> =
-                JSONFunctions.fromJSONArray(
-                    (data['statusPageResources'] as JSONArray) || [],
-                    StatusPageResource
-                );
-
             // save data. set()
 
             setAnnouncement(announcement);
-            setStatusPageResources(statusPageResources);
 
             setIsLoading(false);
             props.onLoadComplete();
         } catch (err) {
             if (err instanceof HTTPErrorResponse) {
-                StatusPageUtil.checkIfTheUserIsAuthenticated(err);
+                await StatusPageUtil.checkIfTheUserIsAuthenticated(err);
             }
 
-            setError(BaseAPI.getFriendlyMessage(err));
+            setError(API.getFriendlyMessage(err));
             setIsLoading(false);
         }
     }, []);
@@ -208,6 +201,7 @@ const Overview: FunctionComponent<PageComponentProps> = (
             {announcement ? <EventItem {...parsedData} /> : <></>}
             {!announcement ? (
                 <EmptyState
+                    id="announcement-empty-state"
                     title={'No Announcement'}
                     description={'Announcement not found on this status page.'}
                     icon={IconProp.Announcement}

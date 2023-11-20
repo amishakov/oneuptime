@@ -1,10 +1,11 @@
 import Link from 'Common/Types/Link';
-import React, { ReactElement, useEffect, useState } from 'react';
+import React, { ReactElement, useState } from 'react';
 import ObjectID from 'Common/Types/ObjectID';
 import BaseModel from 'Common/Models/BaseModel';
 import Page from './Page';
 import ModelAPI from '../../Utils/ModelAPI/ModelAPI';
 import API from '../../Utils/API/API';
+import useAsyncEffect from 'use-async-effect';
 
 export interface ComponentProps<TBaseModel extends BaseModel> {
     title?: string | undefined;
@@ -17,14 +18,16 @@ export interface ComponentProps<TBaseModel extends BaseModel> {
     modelNameField: string;
 }
 
-const ModelPage: Function = <TBaseModel extends BaseModel>(
+const ModelPage: <TBaseModel extends BaseModel>(
+    props: ComponentProps<TBaseModel>
+) => ReactElement = <TBaseModel extends BaseModel>(
     props: ComponentProps<TBaseModel>
 ): ReactElement => {
     const [isLoading, setIsLoading] = useState<boolean>(true);
 
     const [error, setError] = useState<string>('');
 
-    const fetchItem: Function = async (): Promise<void> => {
+    const fetchItem: () => Promise<void> = async (): Promise<void> => {
         // get item.
         setIsLoading(true);
 
@@ -64,9 +67,9 @@ const ModelPage: Function = <TBaseModel extends BaseModel>(
 
     const [title, setTitle] = useState<string | undefined>(props.title);
 
-    useEffect(() => {
+    useAsyncEffect(async () => {
         // fetch the model
-        fetchItem();
+        await fetchItem();
     }, []);
 
     return (

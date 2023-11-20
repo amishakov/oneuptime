@@ -1,21 +1,18 @@
 import PostgresDatabase from '../Infrastructure/PostgresDatabase';
 import Model from 'Model/Models/OnCallDutyPolicyEscalationRule';
-import DatabaseService, {
-    OnCreate,
-    OnDelete,
-    OnUpdate,
-} from './DatabaseService';
+import DatabaseService from './DatabaseService';
+import { OnCreate, OnDelete, OnUpdate } from '../Types/Database/Hooks';
 import CreateBy from '../Types/Database/CreateBy';
 import BadDataException from 'Common/Types/Exception/BadDataException';
 import QueryHelper from '../Types/Database/QueryHelper';
 import DeleteBy from '../Types/Database/DeleteBy';
 import ObjectID from 'Common/Types/ObjectID';
 import LIMIT_MAX, { LIMIT_PER_PROJECT } from 'Common/Types/Database/LimitMax';
-import SortOrder from 'Common/Types/Database/SortOrder';
+import SortOrder from 'Common/Types/BaseDatabase/SortOrder';
 import UpdateBy from '../Types/Database/UpdateBy';
 import Query from '../Types/Database/Query';
 import PositiveNumber from 'Common/Types/PositiveNumber';
-import DatabaseCommonInteractionProps from 'Common/Types/Database/DatabaseCommonInteractionProps';
+import DatabaseCommonInteractionProps from 'Common/Types/BaseDatabase/DatabaseCommonInteractionProps';
 import OnCallDutyPolicyEscalationRuleUser from 'Model/Models/OnCallDutyPolicyEscalationRuleUser';
 import OnCallDutyPolicyEscalationRuleUserService from './OnCallDutyPolicyEscalationRuleUserService';
 import OnCallDutyPolicyEscalationRuleTeam from 'Model/Models/OnCallDutyPolicyEscalationRuleTeam';
@@ -29,7 +26,7 @@ import OnCallDutyExecutionLogTimelineStatus from 'Common/Types/OnCallDutyPolicy/
 import User from 'Model/Models/User';
 import OneUptimeDate from 'Common/Types/Date';
 import OnCallDutyPolicyExecutionLogService from './OnCallDutyPolicyExecutionLogService';
-import { IsBillingEnabled } from '../Config';
+import { IsBillingEnabled } from '../EnvironmentConfig';
 import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
 
 export class Service extends DatabaseService<Model> {
@@ -377,7 +374,7 @@ export class Service extends DatabaseService<Model> {
                     projectId: createBy.data.projectId!,
                     onCallDutyPolicyId:
                         createBy.data.onCallDutyPolicyId! ||
-                        createBy.data.onCallDutyPolicy?._id!,
+                        createBy.data.onCallDutyPolicy?._id,
                 },
                 props: {
                     isRoot: true,
@@ -501,12 +498,13 @@ export class Service extends DatabaseService<Model> {
                 },
             });
 
-            const currentOrder: number = resource?.order!;
+            const currentOrder: number = resource?.order as number;
             const newOrder: number = updateBy.data.order as number;
 
             const resources: Array<Model> = await this.findBy({
                 query: {
-                    onCallDutyPolicyId: resource?.onCallDutyPolicyId!,
+                    onCallDutyPolicyId:
+                        resource?.onCallDutyPolicyId as ObjectID,
                 },
 
                 limit: LIMIT_MAX,
@@ -550,10 +548,7 @@ export class Service extends DatabaseService<Model> {
                 // moving down.
 
                 for (const resource of resources) {
-                    if (
-                        resource.order! < newOrder &&
-                        resource.order! >= currentOrder
-                    ) {
+                    if (resource.order! <= newOrder) {
                         // increment order.
                         await this.updateOneBy({
                             query: {

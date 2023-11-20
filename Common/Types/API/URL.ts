@@ -209,7 +209,15 @@ export default class URL extends DatabaseProperty {
         return this;
     }
 
-    public addQueryParam(paramName: string, value: string): URL {
+    public addQueryParam(
+        paramName: string,
+        value: string,
+        encode?: boolean | undefined
+    ): URL {
+        if (encode) {
+            value = encodeURIComponent(value);
+        }
+
         this.params[paramName] = value;
         return this;
     }

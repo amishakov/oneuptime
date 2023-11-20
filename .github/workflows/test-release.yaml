@@ -35,7 +35,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -76,6 +76,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   test-server-docker-image-deploy:
     needs: generate-build-number
@@ -93,7 +96,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -134,6 +137,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   workflow-docker-image-deploy:
     needs: generate-build-number
@@ -151,7 +157,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -192,6 +198,72 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
+
+
+          
+  otel-collector-docker-image-deploy:
+    needs: generate-build-number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Docker Meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            oneuptime/otel-collector
+            ghcr.io/oneuptime/otel-collector
+          tags: |
+            type=raw,value=test,enable=true
+            type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
+            
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 18.3.0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Generate Dockerfile from Dockerfile.tpl
+        run: npm run prerun
+
+      # Build and deploy otel-collector.
+
+      - name: Login to Docker Hub 
+        uses: docker/login-action@v2.2.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          file: ./OTelCollector/Dockerfile
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   link-shortener-docker-image-deploy:
     needs: generate-build-number
@@ -209,7 +281,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -250,6 +322,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   workers-docker-image-deploy:
     needs: generate-build-number
@@ -267,7 +342,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -308,6 +383,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   status-page-docker-image-deploy:
     needs: generate-build-number
@@ -325,7 +403,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -366,6 +444,72 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
+
+
+
+  test-docker-image-deploy:
+    needs: generate-build-number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Docker Meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            oneuptime/test
+            ghcr.io/oneuptime/test
+          tags: |
+            type=raw,value=test,enable=true
+            type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
+            
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 18.3.0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Generate Dockerfile from Dockerfile.tpl
+        run: npm run prerun
+
+      # Build and deploy test.
+
+      - name: Login to Docker Hub 
+        uses: docker/login-action@v2.2.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          file: ./Tests/Dockerfile
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   realtime-docker-image-deploy:
     needs: generate-build-number
@@ -383,7 +527,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -424,8 +568,11 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
-  probe-api-docker-image-deploy:
+  ingestor-docker-image-deploy:
     needs: generate-build-number
     runs-on: ubuntu-latest
     steps:
@@ -434,14 +581,14 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: |
-            oneuptime/probe-api
-            ghcr.io/oneuptime/probe-api
+            oneuptime/ingestor
+            ghcr.io/oneuptime/ingestor
           tags: |
             type=raw,value=test,enable=true
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -458,7 +605,7 @@ jobs:
       - name: Generate Dockerfile from Dockerfile.tpl
         run: npm run prerun
 
-      # Build and deploy probe-api.
+      # Build and deploy ingestor.
 
       - name: Login to Docker Hub 
         uses: docker/login-action@v2.2.0
@@ -476,12 +623,15 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
-          file: ./ProbeAPI/Dockerfile
+          file: ./Ingestor/Dockerfile
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   notification-docker-image-deploy:
     needs: generate-build-number
@@ -499,7 +649,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -540,64 +690,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-  licensing-docker-image-deploy:
-    needs: generate-build-number
-    runs-on: ubuntu-latest
-    steps:
-      - name: Docker Meta
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: |
-            oneuptime/licensing
-            ghcr.io/oneuptime/licensing
-          tags: |
-            type=raw,value=test,enable=true
-            type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
-            
-
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ github.ref }}
-
-      - uses: actions/setup-node@v2
-        with:
-          node-version: 18.3.0
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Generate Dockerfile from Dockerfile.tpl
-        run: npm run prerun
-
-      # Build and deploy licensing.
-
-      - name: Login to Docker Hub 
-        uses: docker/login-action@v2.2.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2.2.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v4
-        with:
-          file: ./Licensing/Dockerfile
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   integrations-docker-image-deploy:
     needs: generate-build-number
@@ -615,7 +710,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -656,6 +751,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   probe-docker-image-deploy:
     needs: generate-build-number
@@ -673,7 +771,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -714,6 +812,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   identity-docker-image-deploy:
     needs: generate-build-number
@@ -731,7 +832,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -772,6 +873,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   home-docker-image-deploy:
     needs: generate-build-number
@@ -789,7 +893,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -830,64 +934,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
-  helm-chart-docker-image-deploy:
-    needs: generate-build-number
-    runs-on: ubuntu-latest
-    steps:
-      - name: Docker Meta
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: |
-            oneuptime/helm-chart
-            ghcr.io/oneuptime/helm-chart
-          tags: |
-            type=raw,value=test,enable=true
-            type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
-            
-
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ github.ref }}
-
-      - uses: actions/setup-node@v2
-        with:
-          node-version: 18.3.0
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Generate Dockerfile from Dockerfile.tpl
-        run: npm run prerun
-
-      # Build and deploy helm-chart.
-
-      - name: Login to Docker Hub 
-        uses: docker/login-action@v2.2.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2.2.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v4
-        with:
-          file: ./HelmChart/Dockerfile
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
 
   haraka-docker-image-deploy:
     needs: generate-build-number
@@ -905,7 +955,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -946,6 +996,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   file-docker-image-deploy:
     needs: generate-build-number
@@ -963,7 +1016,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -1004,6 +1057,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   dashboard-docker-image-deploy:
     needs: generate-build-number
@@ -1021,7 +1077,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -1062,6 +1118,70 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
+
+  admin-dashboard-docker-image-deploy:
+    needs: generate-build-number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Docker Meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            oneuptime/admin-dashboard
+            ghcr.io/oneuptime/admin-dashboard
+          tags: |
+            type=raw,value=test,enable=true
+            type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
+            
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 18.3.0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Generate Dockerfile from Dockerfile.tpl
+        run: npm run prerun
+
+      # Build and deploy admin-dashboard.
+
+      - name: Login to Docker Hub 
+        uses: docker/login-action@v2.2.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          file: ./AdminDashboard/Dockerfile
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   dashboard-api-docker-image-deploy:
     needs: generate-build-number
@@ -1079,7 +1199,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -1120,6 +1240,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   api-reference-docker-image-deploy:
     needs: generate-build-number
@@ -1137,7 +1260,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -1178,6 +1301,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}
 
   accounts-docker-image-deploy:
     needs: generate-build-number
@@ -1195,7 +1321,7 @@ jobs:
             type=semver,value=7.0.${{needs.generate-build-number.outputs.build_number}}-test,pattern={{version}},enable=true
             
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
@@ -1236,3 +1362,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            APP_VERSION=7.0.${{needs.generate-build-number.outputs.build_number}}

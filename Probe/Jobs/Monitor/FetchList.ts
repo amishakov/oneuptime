@@ -1,7 +1,5 @@
 import API from 'Common/Utils/API';
-import RunCron from '../../Utils/Cron';
-import { EVERY_FIVE_SECONDS } from 'Common/Utils/CronTime';
-import { PROBE_API_URL } from '../../Config';
+import { INGESTOR_URL, PROBE_MONITOR_FETCH_LIMIT } from '../../Config';
 import URL from 'Common/Types/API/URL';
 import HTTPResponse from 'Common/Types/API/HTTPResponse';
 import HTTPErrorResponse from 'Common/Types/API/HTTPErrorResponse';
@@ -12,60 +10,87 @@ import MonitorUtil from '../../Utils/Monitors/Monitor';
 import logger from 'CommonServer/Utils/Logger';
 import JSONFunctions from 'Common/Types/JSONFunctions';
 import { JSONArray } from 'Common/Types/JSON';
+import OneUptimeDate from 'Common/Types/Date';
+import Sleep from 'Common/Types/Sleep';
 
-RunCron(
-    'Monitor: Fetch List and monitor',
-    {
-        schedule: EVERY_FIVE_SECONDS,
-        runOnStartup: false,
-    },
-    async () => {
-        // run a set timeout function randomly between 1 to 5 seconds, so same probes do not hit the server at the same time
+export default class FetchListAndProbe {
+    private workerName: string = '';
 
-        setTimeout(async () => {
-            try {
-                const monitorListUrl: URL = URL.fromString(
-                    PROBE_API_URL.toString()
-                ).addRoute('/monitor/list');
+    public constructor(workerName: string) {
+        this.workerName = workerName;
+    }
 
-                const result: HTTPResponse<JSONArray> | HTTPErrorResponse =
-                    await API.fetch<JSONArray>(
-                        HTTPMethod.POST,
-                        monitorListUrl,
-                        ProbeAPIRequest.getDefaultRequestBody(),
-                        {},
-                        {}
-                    );
+    public async run(): Promise<void> {
+        logger.info(`Running worker ${this.workerName}`);
 
-                const monitors: Array<Monitor> = JSONFunctions.fromJSONArray(
-                    result.data as JSONArray,
-                    Monitor
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            const runTime: Date = OneUptimeDate.getCurrentDate();
+
+            logger.info(`Probing monitors ${this.workerName}`);
+
+            await this.fetchListAndProbe();
+
+            logger.info(`Probing monitors ${this.workerName} complete`);
+
+            // if rumTime  + 5 seconds is in the future, then this fetchLst either errored out or had no monitors in the list. Either way, wait for 5 seconds and proceed.
+
+            const twoSecondsAdded: Date = OneUptimeDate.addRemoveSeconds(
+                runTime,
+                2
+            );
+
+            if (OneUptimeDate.isInTheFuture(twoSecondsAdded)) {
+                logger.info(
+                    `Worker ${this.workerName} is waiting for 2 seconds`
+                );
+                await Sleep.sleep(2000);
+            }
+        }
+    }
+
+    private async fetchListAndProbe(): Promise<void> {
+        try {
+            logger.info('Fetching monitor list');
+
+            const monitorListUrl: URL = URL.fromString(
+                INGESTOR_URL.toString()
+            ).addRoute('/monitor/list');
+
+            const result: HTTPResponse<JSONArray> | HTTPErrorResponse =
+                await API.fetch<JSONArray>(
+                    HTTPMethod.POST,
+                    monitorListUrl,
+                    {
+                        ...ProbeAPIRequest.getDefaultRequestBody(),
+                        limit: PROBE_MONITOR_FETCH_LIMIT || 100,
+                    },
+                    {},
+                    {}
                 );
 
-                const monitoringPromises: Array<Promise<void>> = [];
+            logger.info('Fetched monitor list');
+            logger.info(result);
 
-                for (const monitor of monitors) {
-                    const promise: Promise<void> = new Promise<void>(
-                        (resolve: Function, reject: Function): void => {
-                            MonitorUtil.probeMonitor(monitor)
-                                .then(() => {
-                                    resolve();
-                                })
-                                .catch((err: Error) => {
-                                    logger.error(err);
-                                    reject(err);
-                                });
-                        }
-                    );
+            const monitors: Array<Monitor> = JSONFunctions.fromJSONArray(
+                result.data as JSONArray,
+                Monitor
+            );
 
-                    monitoringPromises.push(promise);
+            for (const monitor of monitors) {
+                try {
+                    await MonitorUtil.probeMonitor(monitor);
+                } catch (err) {
+                    logger.error('Error in probing monitor');
+                    logger.error('Monitor:');
+                    logger.error(monitor);
+                    logger.error('Error:');
+                    logger.error(err);
                 }
-
-                await Promise.allSettled(monitoringPromises);
-            } catch (err) {
-                logger.error('Error in fetching monitor list');
-                logger.error(err);
             }
-        }, Math.floor(Math.random() * 5000) + 1000);
+        } catch (err) {
+            logger.error('Error in fetching monitor list');
+            logger.error(err);
+        }
     }
-);
+}

@@ -1,11 +1,6 @@
 import Route from 'Common/Types/API/Route';
 import ModelPage from 'CommonUI/src/Components/Page/ModelPage';
-import React, {
-    FunctionComponent,
-    ReactElement,
-    useEffect,
-    useState,
-} from 'react';
+import React, { FunctionComponent, ReactElement, useState } from 'react';
 import PageMap from '../../../Utils/PageMap';
 import RouteMap, { RouteUtil } from '../../../Utils/RouteMap';
 import PageComponentProps from '../../PageComponentProps';
@@ -38,6 +33,7 @@ import API from 'CommonUI/src/Utils/API/API';
 import { WORKFLOW_URL } from 'CommonUI/src/Config';
 import URL from 'Common/Types/API/URL';
 import Banner from 'CommonUI/src/Components/Banner/Banner';
+import { useAsyncEffect } from 'use-async-effect';
 
 const Delete: FunctionComponent<PageComponentProps> = (
     _props: PageComponentProps
@@ -60,7 +56,7 @@ const Delete: FunctionComponent<PageComponentProps> = (
 
     const [showRunModal, setShowRunModal] = useState<boolean>(false);
 
-    const loadGraph: Function = async (): Promise<void> => {
+    const loadGraph: () => Promise<void> = async (): Promise<void> => {
         try {
             setIsLoading(true);
             const workflow: WorkflowModel | null = await ModelAPI.getItem(
@@ -257,8 +253,8 @@ const Delete: FunctionComponent<PageComponentProps> = (
         );
     };
 
-    useEffect(() => {
-        loadGraph().catch();
+    useAsyncEffect(async () => {
+        await loadGraph();
     }, []);
 
     return (
@@ -304,9 +300,7 @@ const Delete: FunctionComponent<PageComponentProps> = (
                     openInNewTab={true}
                     title="Need help with building workflows?"
                     description="Watch this 10 minute video which will help you connect Slack with OneUptime using workflows"
-                    link={URL.fromString(
-                        'https://www.youtube.com/watch?v=VX3TwFrpvyI'
-                    )}
+                    link={URL.fromString('https://youtu.be/k1-reCQTZnM')}
                 />
                 <Card
                     title={'Workflow Builder'}

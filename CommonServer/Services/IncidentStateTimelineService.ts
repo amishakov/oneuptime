@@ -1,22 +1,21 @@
 import PostgresDatabase from '../Infrastructure/PostgresDatabase';
 import IncidentStateTimeline from 'Model/Models/IncidentStateTimeline';
-import DatabaseService, { OnCreate, OnDelete } from './DatabaseService';
+import DatabaseService from './DatabaseService';
+
+import { OnCreate, OnDelete } from '../Types/Database/Hooks';
 import BadDataException from 'Common/Types/Exception/BadDataException';
 import IncidentService from './IncidentService';
 import DeleteBy from '../Types/Database/DeleteBy';
 import ObjectID from 'Common/Types/ObjectID';
 import PositiveNumber from 'Common/Types/PositiveNumber';
-import SortOrder from 'Common/Types/Database/SortOrder';
+import SortOrder from 'Common/Types/BaseDatabase/SortOrder';
 import IncidentState from 'Model/Models/IncidentState';
 import IncidentStateService from './IncidentStateService';
-import Incident from 'Model/Models/Incident';
-import MonitorStatusService from './MonitorStatusService';
-import MonitorStatus from 'Model/Models/MonitorStatus';
 import MonitorStatusTimeline from 'Model/Models/MonitorStatusTimeline';
-import MonitorStatusTimelineService from './MonitorStatusTimelineService';
 import CreateBy from '../Types/Database/CreateBy';
 import UserService from './UserService';
 import User from 'Model/Models/User';
+import Incident from 'Model/Models/Incident';
 
 export class Service extends DatabaseService<IncidentStateTimeline> {
     public constructor(postgresDatabase?: PostgresDatabase) {
@@ -70,7 +69,7 @@ export class Service extends DatabaseService<IncidentStateTimeline> {
 
             const user: User | null = await UserService.findOneBy({
                 query: {
-                    _id: userId?.toString()!,
+                    _id: userId?.toString() as string,
                 },
                 select: {
                     _id: true,
@@ -130,10 +129,9 @@ export class Service extends DatabaseService<IncidentStateTimeline> {
             });
 
         if (isResolvedState) {
-            // resolve all the monitors.
             const incident: Incident | null = await IncidentService.findOneBy({
                 query: {
-                    _id: createdItem.incidentId?.toString(),
+                    _id: createdItem.incidentId.toString(),
                 },
                 select: {
                     _id: true,
@@ -147,68 +145,11 @@ export class Service extends DatabaseService<IncidentStateTimeline> {
                 },
             });
 
-            if (incident && incident.monitors && incident.monitors.length > 0) {
-                // get resolved monitor state.
-                const resolvedMonitorState: MonitorStatus | null =
-                    await MonitorStatusService.findOneBy({
-                        query: {
-                            projectId: incident.projectId!,
-                            isOperationalState: true,
-                        },
-                        props: {
-                            isRoot: true,
-                        },
-                        select: {
-                            _id: true,
-                        },
-                    });
-
-                if (resolvedMonitorState) {
-                    for (const monitor of incident.monitors) {
-                        //check state of the monitor.
-
-                        const latestState: MonitorStatusTimeline | null =
-                            await MonitorStatusTimelineService.findOneBy({
-                                query: {
-                                    monitorId: monitor.id!,
-                                    projectId: incident.projectId!,
-                                },
-                                select: {
-                                    _id: true,
-                                    monitorStatusId: true,
-                                },
-                                props: {
-                                    isRoot: true,
-                                },
-                                sort: {
-                                    createdAt: SortOrder.Descending,
-                                },
-                            });
-
-                        if (
-                            latestState &&
-                            latestState.monitorStatusId?.toString() ===
-                                resolvedMonitorState.id!.toString()
-                        ) {
-                            // already on this state. Skip.
-                            continue;
-                        }
-
-                        const monitorStatusTimeline: MonitorStatusTimeline =
-                            new MonitorStatusTimeline();
-                        monitorStatusTimeline.monitorId = monitor.id!;
-                        monitorStatusTimeline.projectId = incident.projectId!;
-                        monitorStatusTimeline.monitorStatusId =
-                            resolvedMonitorState.id!;
-
-                        await MonitorStatusTimelineService.create({
-                            data: monitorStatusTimeline,
-                            props: {
-                                isRoot: true,
-                            },
-                        });
-                    }
-                }
+            if (incident) {
+                await IncidentService.markMonitorsActiveForMonitoring(
+                    incident.projectId!,
+                    incident.monitors || []
+                );
             }
         }
 

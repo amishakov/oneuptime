@@ -30,10 +30,11 @@ import { LIMIT_PER_PROJECT } from 'Common/Types/Database/LimitMax';
 import Dictionary from 'Common/Types/Dictionary';
 import IncidentSeverity from 'Model/Models/IncidentSeverity';
 import IncidentSeverityService from '../../Services/IncidentSeverityService';
-import SortOrder from 'Common/Types/Database/SortOrder';
+import SortOrder from 'Common/Types/BaseDatabase/SortOrder';
 import OnCallDutyPolicy from 'Model/Models/OnCallDutyPolicy';
 import IncomingMonitorRequest from 'Common/Types/Monitor/IncomingMonitor/IncomingMonitorRequest';
 import MonitorType from 'Common/Types/Monitor/MonitorType';
+import VMUtil from '../VM';
 
 export default class ProbeMonitorResponseService {
     public static async processProbeResponse(
@@ -45,6 +46,9 @@ export default class ProbeMonitorResponseService {
             rootCause: null,
         };
 
+        logger.info('Processing probe response');
+        logger.info('Monitor ID: ' + dataToProcess.monitorId);
+
         // fetch monitor
         const monitor: Monitor | null = await MonitorService.findOneById({
             id: dataToProcess.monitorId,
@@ -53,6 +57,8 @@ export default class ProbeMonitorResponseService {
                 monitorType: true,
                 projectId: true,
                 disableActiveMonitoring: true,
+                disableActiveMonitoringBecauseOfManualIncident: true,
+                disableActiveMonitoringBecauseOfScheduledMaintenanceEvent: true,
                 currentMonitorStatusId: true,
                 _id: true,
             },
@@ -66,14 +72,43 @@ export default class ProbeMonitorResponseService {
         }
 
         if (monitor.disableActiveMonitoring) {
+            logger.info(
+                `${dataToProcess.monitorId.toString()} Monitor is disabled. Please enable it to start monitoring again.`
+            );
+
             throw new BadDataException(
                 'Monitor is disabled. Please enable it to start monitoring again.'
+            );
+        }
+
+        if (monitor.disableActiveMonitoringBecauseOfManualIncident) {
+            logger.info(
+                `${dataToProcess.monitorId.toString()} Monitor is disabled because an incident which is created manually is not resolved. Please resolve the incident to start monitoring again.`
+            );
+
+            throw new BadDataException(
+                'Monitor is disabled because an incident which is created manually is not resolved. Please resolve the incident to start monitoring again.'
+            );
+        }
+
+        if (monitor.disableActiveMonitoringBecauseOfScheduledMaintenanceEvent) {
+            logger.info(
+                `${dataToProcess.monitorId.toString()} Monitor is disabled because one of the scheduled maintenance event this monitor is attached to has not ended. Please end the scheduled maintenance event to start monitoring again.`
+            );
+
+            throw new BadDataException(
+                'Monitor is disabled because one of the scheduled maintenance event this monitor is attached to has not ended. Please end the scheduled maintenance event to start monitoring again.'
             );
         }
 
         // save the last log to MonitorProbe.
 
         // get last log. We do this because there are many monitoring steps and we need to store those.
+        logger.info(
+            `${dataToProcess.monitorId.toString()} - monitor type ${
+                monitor.monitorType
+            }`
+        );
 
         if (
             monitor.monitorType === MonitorType.API ||
@@ -154,6 +189,9 @@ export default class ProbeMonitorResponseService {
             monitorSteps.data?.monitorStepsInstanceArray.length === 0
         ) {
             // no steps, ignore everything. This happens when the monitor is updated shortly after the probing attempt.
+            logger.info(
+                `${dataToProcess.monitorId.toString()} - No monitoring steps.`
+            );
             return response;
         }
 
@@ -255,6 +293,17 @@ export default class ProbeMonitorResponseService {
         });
 
         if (response.criteriaMetId && response.rootCause) {
+            logger.info(
+                `${dataToProcess.monitorId.toString()} - Criteria met: ${
+                    response.criteriaMetId
+                }`
+            );
+            logger.info(
+                `${dataToProcess.monitorId.toString()} - Root cause: ${
+                    response.rootCause
+                }`
+            );
+
             await this.criteriaMetCreateIncidentsAndUpdateMonitorStatus({
                 monitor: monitor,
                 rootCause: response.rootCause,
@@ -268,6 +317,10 @@ export default class ProbeMonitorResponseService {
             monitor.currentMonitorStatusId?.toString() !==
                 monitorSteps.data.defaultMonitorStatusId.toString()
         ) {
+            logger.info(
+                `${dataToProcess.monitorId.toString()} - No criteria met. Change to default status.`
+            );
+
             await this.checkOpenIncidentsAndCloseIfResolved({
                 monitorId: monitor.id!,
                 autoResolveCriteriaInstanceIdIncidentIdsDictionary,
@@ -288,7 +341,7 @@ export default class ProbeMonitorResponseService {
                 JSON.stringify(dataToProcess)
             );
             monitorStatusTimeline.rootCause =
-                'No monitoring criteria met. Change to default status.';
+                'No monitoring criteria met. Change to default status. ';
             await MonitorStatusTimelineService.create({
                 data: monitorStatusTimeline,
                 props: {
@@ -371,6 +424,9 @@ export default class ProbeMonitorResponseService {
             input.criteriaInstance.data?.monitorStatusId.toString() !==
                 input.monitor.currentMonitorStatusId?.toString()
         ) {
+            logger.info(
+                `${input.monitor.id?.toString()} - Change monitor status to ${input.criteriaInstance.data?.monitorStatusId.toString()}`
+            );
             // change monitor status
 
             const monitorStatusId: ObjectID | undefined =
@@ -397,7 +453,7 @@ export default class ProbeMonitorResponseService {
         }
 
         // check open incidents
-
+        logger.info(`${input.monitor.id?.toString()} - Check open incidents.`);
         // check active incidents and if there are open incidents, do not cretae anothr incident.
         const openIncidents: Array<Incident> =
             await this.checkOpenIncidentsAndCloseIfResolved({
@@ -415,7 +471,8 @@ export default class ProbeMonitorResponseService {
             for (const criteriaIncident of input.criteriaInstance.data
                 ?.incidents || []) {
                 // should create incident.
-                const hasAlreadyOpenIncident: boolean = Boolean(
+
+                const alreadyOpenIncident: Incident | undefined =
                     openIncidents.find((incident: Incident) => {
                         return (
                             incident.createdCriteriaId ===
@@ -423,7 +480,17 @@ export default class ProbeMonitorResponseService {
                             incident.createdIncidentTemplateId ===
                                 criteriaIncident.id.toString()
                         );
-                    })
+                    });
+
+                const hasAlreadyOpenIncident: boolean =
+                    Boolean(alreadyOpenIncident);
+
+                logger.info(
+                    `${input.monitor.id?.toString()} - Open Incident ${alreadyOpenIncident?.id?.toString()}`
+                );
+
+                logger.info(
+                    `${input.monitor.id?.toString()} - Has open incident ${hasAlreadyOpenIncident}`
                 );
 
                 if (hasAlreadyOpenIncident) {
@@ -431,6 +498,10 @@ export default class ProbeMonitorResponseService {
                 }
 
                 // create incident here.
+
+                logger.info(
+                    `${input.monitor.id?.toString()} - Create incident.`
+                );
 
                 const incident: Incident = new Incident();
 
@@ -488,6 +559,17 @@ export default class ProbeMonitorResponseService {
                         onCallPolicy._id = id.toString();
                         return onCallPolicy;
                     }) || [];
+
+                incident.isCreatedAutomatically = true;
+
+                if (
+                    input.dataToProcess &&
+                    (input.dataToProcess as ProbeMonitorResponse).probeId
+                ) {
+                    incident.createdByProbeId = (
+                        input.dataToProcess as ProbeMonitorResponse
+                    ).probeId;
+                }
 
                 await IncidentService.create({
                     data: incident,
@@ -611,7 +693,13 @@ export default class ProbeMonitorResponseService {
             if (rootCause) {
                 input.probeApiIngestResponse.criteriaMetId =
                     criteriaInstance.data?.id;
-                input.probeApiIngestResponse.rootCause = rootCause;
+                input.probeApiIngestResponse.rootCause =
+                    rootCause +
+                    ' ' +
+                    (
+                        (input.dataToProcess as ProbeMonitorResponse)
+                            .failureCause || ''
+                    ).replace('Error:', '');
                 break;
             }
         }
@@ -718,6 +806,90 @@ export default class ProbeMonitorResponseService {
         // process monitor criteria filter here.
         let value: number | string | undefined = input.criteriaFilter.value;
         //check is online filter
+
+        if (input.criteriaFilter.checkOn === CheckOn.JavaScriptExpression) {
+            let storageMap: JSONObject = {};
+
+            if (
+                input.monitor.monitorType === MonitorType.API ||
+                input.monitor.monitorType === MonitorType.Website
+            ) {
+                // try to parse json
+                let responseBody: JSONObject | null = null;
+                try {
+                    responseBody = JSON.parse(
+                        ((input.dataToProcess as ProbeMonitorResponse)
+                            .responseBody as string) || '{}'
+                    );
+                } catch (err) {
+                    responseBody = (input.dataToProcess as ProbeMonitorResponse)
+                        .responseBody as JSONObject;
+                }
+
+                if (
+                    typeof responseBody === Typeof.String &&
+                    responseBody?.toString() === ''
+                ) {
+                    // if empty string then set to empty object.
+                    responseBody = {};
+                }
+
+                storageMap = {
+                    responseBody: responseBody,
+                    responseHeaders: (
+                        input.dataToProcess as ProbeMonitorResponse
+                    ).responseHeaders,
+                    responseStatusCode: (
+                        input.dataToProcess as ProbeMonitorResponse
+                    ).responseCode,
+                    responseTimeInMs: (
+                        input.dataToProcess as ProbeMonitorResponse
+                    ).responseTimeInMs,
+                    isOnline: (input.dataToProcess as ProbeMonitorResponse)
+                        .isOnline,
+                };
+            }
+
+            if (input.monitor.monitorType === MonitorType.IncomingRequest) {
+                storageMap = {
+                    requestBody: (input.dataToProcess as IncomingMonitorRequest)
+                        .requestBody,
+                    requestHeaders: (
+                        input.dataToProcess as IncomingMonitorRequest
+                    ).requestHeaders,
+                };
+            }
+
+            // now evaluate the expression.
+            let expression: string = input.criteriaFilter.value as string;
+            expression = VMUtil.replaceValueInPlace(
+                storageMap,
+                expression,
+                false
+            ); // now pass this to the VM.
+
+            const code: string = `return Boolean(${expression});`;
+            let result: any = null;
+
+            try {
+                result = await VMUtil.runCodeInSandbox(code, {
+                    timeout: 1000,
+                    allowAsync: false,
+                    args: {},
+                    includeHttpPackage: false,
+                });
+            } catch (err) {
+                logger.error(err);
+                return null;
+            }
+
+            if (result) {
+                return `JavaScript Expression - ${expression} - evaluated to true.`;
+            }
+
+            return null; // if true then return null.
+        }
+
         if (
             input.criteriaFilter.checkOn === CheckOn.IsOnline &&
             input.criteriaFilter.filterType === FilterType.True

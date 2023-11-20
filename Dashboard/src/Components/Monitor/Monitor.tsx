@@ -5,10 +5,13 @@ import Route from 'Common/Types/API/Route';
 import RouteMap, { RouteUtil } from '../../Utils/RouteMap';
 import PageMap from '../../Utils/PageMap';
 import ObjectID from 'Common/Types/ObjectID';
+import Icon from 'CommonUI/src/Components/Icon/Icon';
+import IconProp from 'Common/Types/Icon/IconProp';
 
 export interface ComponentProps {
     monitor: Monitor;
     onNavigateComplete?: (() => void) | undefined;
+    showIcon?: boolean;
 }
 
 const MonitorElement: FunctionComponent<ComponentProps> = (
@@ -26,7 +29,17 @@ const MonitorElement: FunctionComponent<ComponentProps> = (
                     }
                 )}
             >
-                <span>{props.monitor.name}</span>
+                <span className="flex">
+                    {props.showIcon ? (
+                        <Icon
+                            icon={IconProp.AltGlobe}
+                            className="w-5 h-5 mr-1"
+                        />
+                    ) : (
+                        <></>
+                    )}{' '}
+                    {props.monitor.name}
+                </span>
             </Link>
         );
     }

@@ -17,9 +17,9 @@ import ColumnAccessControl from 'Common/Types/Database/AccessControl/ColumnAcces
 import UniqueColumnBy from 'Common/Types/Database/UniqueColumnBy';
 import TenantColumn from 'Common/Types/Database/TenantColumn';
 import TableMetadata from 'Common/Types/Database/TableMetadata';
-import EnableWorkflow from 'Common/Types/Model/EnableWorkflow';
+import EnableWorkflow from 'Common/Types/Database/EnableWorkflow';
 import IconProp from 'Common/Types/Icon/IconProp';
-import EnableDocumentation from 'Common/Types/Model/EnableDocumentation';
+import EnableDocumentation from 'Common/Types/Database/EnableDocumentation';
 import TableBillingAccessControl from 'Common/Types/Database/AccessControl/TableBillingAccessControl';
 import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
 
@@ -27,7 +27,7 @@ import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
     create: PlanSelect.Growth,
     read: PlanSelect.Free,
     update: PlanSelect.Growth,
-    delete: PlanSelect.Growth,
+    delete: PlanSelect.Free,
 })
 @EnableDocumentation()
 @TenantColumn('projectId')
@@ -459,6 +459,39 @@ export default class ScheduledMaintenanceState extends BaseModel {
         default: false,
     })
     public isOngoingState?: boolean = undefined;
+
+    @ColumnAccessControl({
+        create: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanCreateScheduledMaintenanceState,
+        ],
+        read: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanReadScheduledMaintenanceState,
+        ],
+        update: [
+            Permission.ProjectOwner,
+            Permission.ProjectAdmin,
+            Permission.ProjectMember,
+            Permission.CanEditScheduledMaintenanceState,
+        ],
+    })
+    @TableColumn({
+        isDefaultValueColumn: false,
+        type: TableColumnType.Boolean,
+        canReadOnRelationQuery: true,
+        title: 'Ended State',
+        description: 'Is this state a ended state?',
+    })
+    @Column({
+        type: ColumnType.Boolean,
+        default: false,
+    })
+    public isEndedState?: boolean = undefined;
 
     @ColumnAccessControl({
         create: [

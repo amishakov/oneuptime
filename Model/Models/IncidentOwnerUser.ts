@@ -13,9 +13,9 @@ import Permission from 'Common/Types/Permission';
 import ColumnAccessControl from 'Common/Types/Database/AccessControl/ColumnAccessControl';
 import TenantColumn from 'Common/Types/Database/TenantColumn';
 import TableMetadata from 'Common/Types/Database/TableMetadata';
-import EnableWorkflow from 'Common/Types/Model/EnableWorkflow';
+import EnableWorkflow from 'Common/Types/Database/EnableWorkflow';
 import IconProp from 'Common/Types/Icon/IconProp';
-import EnableDocumentation from 'Common/Types/Model/EnableDocumentation';
+import EnableDocumentation from 'Common/Types/Database/EnableDocumentation';
 import Incident from './Incident';
 
 @EnableDocumentation()
@@ -24,6 +24,7 @@ import Incident from './Incident';
     create: [
         Permission.ProjectOwner,
         Permission.ProjectAdmin,
+        Permission.ProjectMember,
         Permission.CanCreateIncidentOwnerUser,
     ],
     read: [
@@ -35,11 +36,13 @@ import Incident from './Incident';
     delete: [
         Permission.ProjectOwner,
         Permission.ProjectAdmin,
+        Permission.ProjectMember,
         Permission.CanDeleteIncidentOwnerUser,
     ],
     update: [
         Permission.ProjectOwner,
         Permission.ProjectAdmin,
+        Permission.ProjectMember,
         Permission.CanEditIncidentOwnerUser,
     ],
 })
@@ -65,6 +68,7 @@ export default class IncidentOwnerUser extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateIncidentOwnerUser,
         ],
         read: [
@@ -101,6 +105,7 @@ export default class IncidentOwnerUser extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateIncidentOwnerUser,
         ],
         read: [
@@ -131,6 +136,7 @@ export default class IncidentOwnerUser extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateIncidentOwnerUser,
         ],
         read: [
@@ -167,6 +173,7 @@ export default class IncidentOwnerUser extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateIncidentOwnerUser,
         ],
         read: [
@@ -196,6 +203,7 @@ export default class IncidentOwnerUser extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateIncidentOwnerUser,
         ],
         read: [
@@ -232,6 +240,7 @@ export default class IncidentOwnerUser extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateIncidentOwnerUser,
         ],
         read: [
@@ -262,6 +271,7 @@ export default class IncidentOwnerUser extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateIncidentOwnerUser,
         ],
         read: [
@@ -298,6 +308,7 @@ export default class IncidentOwnerUser extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateIncidentOwnerUser,
         ],
         read: [
@@ -380,6 +391,7 @@ export default class IncidentOwnerUser extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateIncidentOwnerUser,
         ],
         read: [

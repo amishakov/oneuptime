@@ -30,9 +30,7 @@ import ColumnLength from 'Common/Types/Database/ColumnLength';
 import SignatureMethod from 'Common/Types/SSO/SignatureMethod';
 import DigestMethod from 'Common/Types/SSO/DigestMethod';
 import Team from './Team';
-import MultiTenentQueryAllowed from 'Common/Types/Database/MultiTenentQueryAllowed';
 
-@MultiTenentQueryAllowed(true)
 @TableBillingAccessControl({
     create: PlanSelect.Scale,
     read: PlanSelect.Scale,
@@ -50,9 +48,7 @@ import MultiTenentQueryAllowed from 'Common/Types/Database/MultiTenentQueryAllow
         Permission.ProjectOwner,
         Permission.ProjectUser,
         Permission.UnAuthorizedSsoUser,
-        Permission.ProjectAdmin,
-        Permission.ProjectUser,
-        Permission.UnAuthorizedSsoUser,
+        Permission.ProjectMember,
         Permission.CanReadProjectSSO,
     ],
     delete: [
@@ -88,9 +84,9 @@ export default class ProjectSSO extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.ProjectUser,
+            Permission.Public,
             Permission.UnAuthorizedSsoUser,
-            Permission.ProjectUser,
-            Permission.UnAuthorizedSsoUser,
+            Permission.ProjectMember,
             Permission.CanReadProjectSSO,
         ],
         update: [],
@@ -127,7 +123,9 @@ export default class ProjectSSO extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.ProjectUser,
+            Permission.Public,
             Permission.UnAuthorizedSsoUser,
+            Permission.ProjectMember,
             Permission.CanReadProjectSSO,
             Permission.ProjectUser,
             Permission.UnAuthorizedSsoUser,
@@ -160,7 +158,9 @@ export default class ProjectSSO extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.ProjectUser,
+            Permission.Public,
             Permission.UnAuthorizedSsoUser,
+            Permission.ProjectMember,
             Permission.CanReadProjectSSO,
             Permission.ProjectUser,
             Permission.UnAuthorizedSsoUser,
@@ -196,7 +196,9 @@ export default class ProjectSSO extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.ProjectUser,
+            Permission.Public,
             Permission.UnAuthorizedSsoUser,
+            Permission.ProjectMember,
             Permission.CanReadProjectSSO,
         ],
         update: [
@@ -225,7 +227,6 @@ export default class ProjectSSO extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
-
             Permission.CanReadProjectSSO,
         ],
         update: [
@@ -255,7 +256,6 @@ export default class ProjectSSO extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
-
             Permission.CanReadProjectSSO,
         ],
         update: [
@@ -285,7 +285,9 @@ export default class ProjectSSO extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSSO,
+            Permission.Public,
             Permission.ProjectUser,
             Permission.UnAuthorizedSsoUser,
         ],
@@ -317,6 +319,7 @@ export default class ProjectSSO extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSSO,
         ],
         update: [
@@ -388,7 +391,6 @@ export default class ProjectSSO extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
-
             Permission.CanReadProjectSSO,
         ],
         update: [
@@ -418,6 +420,7 @@ export default class ProjectSSO extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
 
+            Permission.ProjectMember,
             Permission.CanReadProjectSSO,
         ],
         update: [],
@@ -454,6 +457,7 @@ export default class ProjectSSO extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
 
+            Permission.ProjectMember,
             Permission.CanReadProjectSSO,
         ],
         update: [],
@@ -477,6 +481,7 @@ export default class ProjectSSO extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
 
+            Permission.ProjectMember,
             Permission.CanReadProjectSSO,
         ],
         update: [],
@@ -509,6 +514,7 @@ export default class ProjectSSO extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
 
+            Permission.ProjectMember,
             Permission.CanReadProjectSSO,
         ],
         update: [],
@@ -537,6 +543,7 @@ export default class ProjectSSO extends BaseModel {
             Permission.ProjectAdmin,
             Permission.ProjectUser,
             Permission.UnAuthorizedSsoUser,
+            Permission.ProjectMember,
             Permission.CanReadProjectSSO,
         ],
         update: [
@@ -563,6 +570,7 @@ export default class ProjectSSO extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
 
+            Permission.ProjectMember,
             Permission.CanReadProjectSSO,
         ],
         update: [],

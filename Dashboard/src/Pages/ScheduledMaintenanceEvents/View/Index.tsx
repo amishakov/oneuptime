@@ -7,7 +7,6 @@ import PageComponentProps from '../../PageComponentProps';
 import SideMenu from './SideMenu';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
-import IconProp from 'Common/Types/Icon/IconProp';
 import CardModelDetail from 'CommonUI/src/Components/ModelDetail/CardModelDetail';
 import Navigation from 'CommonUI/src/Utils/Navigation';
 import { JSONArray, JSONObject } from 'Common/Types/JSON';
@@ -73,7 +72,6 @@ const ScheduledMaintenanceView: FunctionComponent<PageComponentProps> = (
                 cardProps={{
                     title: 'Scheduled Maintenance Details',
                     description: 'Here are more details for this event.',
-                    icon: IconProp.Clock,
                 }}
                 formSteps={[
                     {
@@ -352,7 +350,7 @@ const ScheduledMaintenanceView: FunctionComponent<PageComponentProps> = (
                                 },
                             },
                             title: 'Labels',
-                            type: FieldType.Text,
+                            fieldType: FieldType.Element,
                             getElement: (item: JSONObject): ReactElement => {
                                 return (
                                     <LabelsElement
@@ -372,20 +370,22 @@ const ScheduledMaintenanceView: FunctionComponent<PageComponentProps> = (
                             fieldType: FieldType.Element,
                             getElement: (
                                 _item: JSONObject,
-                                onBeforeFetchData: JSONObject,
-                                fetchItems: Function
+                                onBeforeFetchData: JSONObject | undefined,
+                                fetchItems: Function | undefined
                             ): ReactElement => {
                                 return (
                                     <ChangeScheduledMaintenanceState
                                         scheduledMaintenanceId={modelId}
                                         scheduledMaintenanceTimeline={
-                                            onBeforeFetchData[
-                                                'data'
-                                            ] as Array<BaseModel>
+                                            onBeforeFetchData
+                                                ? (onBeforeFetchData[
+                                                      'data'
+                                                  ] as Array<BaseModel>)
+                                                : []
                                         }
                                         stateType={StateType.Ongoing}
                                         onActionComplete={() => {
-                                            fetchItems();
+                                            fetchItems && fetchItems();
                                         }}
                                     />
                                 );
@@ -396,20 +396,22 @@ const ScheduledMaintenanceView: FunctionComponent<PageComponentProps> = (
                             fieldType: FieldType.Element,
                             getElement: (
                                 _item: JSONObject,
-                                onBeforeFetchData: JSONObject,
-                                fetchItems: Function
+                                onBeforeFetchData: JSONObject | undefined,
+                                fetchItems: Function | undefined
                             ): ReactElement => {
                                 return (
                                     <ChangeScheduledMaintenanceState
                                         scheduledMaintenanceId={modelId}
                                         scheduledMaintenanceTimeline={
-                                            onBeforeFetchData[
-                                                'data'
-                                            ] as Array<BaseModel>
+                                            onBeforeFetchData
+                                                ? (onBeforeFetchData[
+                                                      'data'
+                                                  ] as Array<BaseModel>)
+                                                : []
                                         }
                                         stateType={StateType.Completed}
                                         onActionComplete={() => {
-                                            fetchItems();
+                                            fetchItems && fetchItems();
                                         }}
                                     />
                                 );
@@ -426,7 +428,6 @@ const ScheduledMaintenanceView: FunctionComponent<PageComponentProps> = (
                     title: 'Event Description',
                     description:
                         'Description for this event. This is visible on Status Page and is in markdown format.',
-                    icon: IconProp.AltGlobe,
                 }}
                 editButtonText="Edit Event Description"
                 isEditable={true}

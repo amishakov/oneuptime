@@ -7,6 +7,8 @@ import HTML from 'Common/Types/Html';
 import { AxiosError } from 'axios';
 import logger from 'CommonServer/Utils/Logger';
 import HTTPMethod from 'Common/Types/API/HTTPMethod';
+import ObjectID from 'Common/Types/ObjectID';
+import Sleep from 'Common/Types/Sleep';
 
 export interface ProbeWebsiteResponse {
     url: URL;
@@ -17,16 +19,84 @@ export interface ProbeWebsiteResponse {
     responseBody: HTML | undefined;
     responseHeaders: Headers | undefined;
     isOnline: boolean;
+    failureCause: string;
 }
 
 export default class WebsiteMonitor {
+    // burn domain names into the code to see if this probe is online.
+    public static async isProbeOnline(): Promise<boolean> {
+        if (
+            (
+                await WebsiteMonitor.ping(
+                    URL.fromString('https://google.com'),
+                    {
+                        isHeadRequest: true,
+                        isOnlineCheckRequest: true,
+                    }
+                )
+            )?.isOnline
+        ) {
+            return true;
+        } else if (
+            (
+                await WebsiteMonitor.ping(
+                    URL.fromString('https://facebook.com'),
+                    {
+                        isHeadRequest: true,
+                        isOnlineCheckRequest: true,
+                    }
+                )
+            )?.isOnline
+        ) {
+            return true;
+        } else if (
+            (
+                await WebsiteMonitor.ping(
+                    URL.fromString('https://microsoft.com'),
+                    {
+                        isHeadRequest: true,
+                        isOnlineCheckRequest: true,
+                    }
+                )
+            )?.isOnline
+        ) {
+            return true;
+        } else if (
+            (
+                await WebsiteMonitor.ping(
+                    URL.fromString('https://youtube.com'),
+                    {
+                        isHeadRequest: true,
+                        isOnlineCheckRequest: true,
+                    }
+                )
+            )?.isOnline
+        ) {
+            return true;
+        } else if (
+            (
+                await WebsiteMonitor.ping(URL.fromString('https://apple.com'), {
+                    isHeadRequest: true,
+                    isOnlineCheckRequest: true,
+                })
+            )?.isOnline
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
     public static async ping(
         url: URL,
         options: {
             retry?: number | undefined;
             isHeadRequest?: boolean | undefined;
+            currentRetryCount?: number | undefined;
+            monitorId?: ObjectID | undefined;
+            isOnlineCheckRequest?: boolean | undefined;
         }
-    ): Promise<ProbeWebsiteResponse> {
+    ): Promise<ProbeWebsiteResponse | null> {
         let requestType: HTTPMethod = HTTPMethod.GET;
 
         if (options.isHeadRequest) {
@@ -35,13 +105,28 @@ export default class WebsiteMonitor {
 
         try {
             logger.info(
-                `Website Monitor - Pinging ${requestType} ${url.toString()}`
+                `Website Monitor - Pinging ${options.monitorId?.toString()} ${requestType} ${url.toString()} - Retry: ${
+                    options.currentRetryCount
+                }`
             );
 
-            const startTime: [number, number] = process.hrtime();
-            const result: WebsiteResponse = await WebsiteRequest.fetch(url, {
+            let startTime: [number, number] = process.hrtime();
+            let result: WebsiteResponse = await WebsiteRequest.fetch(url, {
                 isHeadRequest: options.isHeadRequest,
+                timeout: 30000,
             });
+
+            if (
+                result.responseStatusCode >= 400 &&
+                result.responseStatusCode < 600 &&
+                requestType === HTTPMethod.HEAD
+            ) {
+                startTime = process.hrtime();
+                result = await WebsiteRequest.fetch(url, {
+                    isHeadRequest: false,
+                    timeout: 30000,
+                });
+            }
 
             const endTime: [number, number] = process.hrtime(startTime);
             const responseTimeInMS: PositiveNumber = new PositiveNumber(
@@ -57,34 +142,36 @@ export default class WebsiteMonitor {
                 statusCode: result.responseStatusCode,
                 responseBody: result.responseBody,
                 responseHeaders: result.responseHeaders,
+                failureCause: '',
             };
 
             logger.info(
-                `Website Monitor - Pinging ${requestType} ${url.toString()} Success - Response: ${JSON.stringify(
+                `Website Monitor - Pinging ${options.monitorId?.toString()} ${requestType} ${url.toString()} Success - Response: ${JSON.stringify(
                     probeWebsiteResponse
                 )}`
             );
 
             return probeWebsiteResponse;
-        } catch (err) {
+        } catch (err: unknown) {
             if (!options) {
                 options = {};
             }
 
-            if (!options.retry) {
-                options.retry = 0; // default value
+            if (!options.currentRetryCount) {
+                options.currentRetryCount = 0; // default value
             }
 
-            if (options.retry < 5) {
-                options.retry++;
+            if (options.currentRetryCount < (options.retry || 5)) {
+                options.currentRetryCount++;
+                await Sleep.sleep(1000);
                 return await this.ping(url, options);
             }
 
-            let probeWebisteResponse: ProbeWebsiteResponse | undefined =
+            let probeWebsiteResponse: ProbeWebsiteResponse | undefined =
                 undefined;
 
             if (err instanceof AxiosError) {
-                probeWebisteResponse = {
+                probeWebsiteResponse = {
                     url: url,
                     isOnline: Boolean(err.response),
                     requestHeaders: {},
@@ -93,9 +180,10 @@ export default class WebsiteMonitor {
                     statusCode: err.response?.status,
                     responseBody: err.response?.data,
                     responseHeaders: (err.response?.headers as Headers) || {},
+                    failureCause: err.message || err.toString(),
                 };
             } else {
-                probeWebisteResponse = {
+                probeWebsiteResponse = {
                     url: url,
                     isOnline: false,
                     requestHeaders: {},
@@ -104,16 +192,40 @@ export default class WebsiteMonitor {
                     statusCode: undefined,
                     responseBody: undefined,
                     responseHeaders: undefined,
+                    failureCause: (err as Error).toString(),
                 };
             }
 
+            // check if timeout exceeded and if yes, return null
+            if (
+                (err as any).toString().includes('timeout') &&
+                (err as any).toString().includes('exceeded')
+            ) {
+                logger.info(
+                    `Website Monitor - Timeout exceeded ${options.monitorId?.toString()} ${requestType} ${url.toString()} - ERROR: ${err}`
+                );
+                probeWebsiteResponse.failureCause = 'Timeout exceeded';
+                probeWebsiteResponse.isOnline = false;
+
+                return probeWebsiteResponse;
+            }
+
+            if (!options.isOnlineCheckRequest) {
+                if (!(await WebsiteMonitor.isProbeOnline())) {
+                    logger.error(
+                        `Website Monitor - Probe is not online. Cannot ping ${options.monitorId?.toString()} ${requestType} ${url.toString()} - ERROR: ${err}`
+                    );
+                    return null;
+                }
+            }
+
             logger.error(
-                `Website Monitor - Pinging ${requestType} ${url.toString()} - ERROR: ${err} Response: ${JSON.stringify(
-                    probeWebisteResponse
+                `Website Monitor - Pinging ${options.monitorId?.toString()} ${requestType} ${url.toString()} - ERROR: ${err} Response: ${JSON.stringify(
+                    probeWebsiteResponse
                 )}`
             );
 
-            return probeWebisteResponse;
+            return probeWebsiteResponse;
         }
     }
 }

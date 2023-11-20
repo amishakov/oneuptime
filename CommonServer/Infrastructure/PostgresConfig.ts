@@ -11,7 +11,7 @@ import {
     DatabaseRejectUnauthorized,
     ShouldDatabaseSslEnable,
     Env,
-} from '../Config';
+} from '../EnvironmentConfig';
 import Entities from 'Model/Models/Index';
 import Migrations from 'Model/Migrations/Index';
 import DatabaseType from 'Common/Types/DatabaseType';
@@ -49,7 +49,7 @@ export const testDataSourceOptions: DataSourceOptions = {
     port: DatabasePort.toNumber(),
     username: DatabaseUsername,
     password: DatabasePassword,
-    database: DatabaseName + Faker.random16Numbers(),
+    database: DatabaseName + Faker.randomNumbers(16),
     entities: Entities,
     synchronize:
         Env === AppEnvironment.Test || Env === AppEnvironment.Development,

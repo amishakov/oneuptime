@@ -1,12 +1,7 @@
 import UserCall from 'Model/Models/UserCall';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
 import IconProp from 'Common/Types/Icon/IconProp';
-import React, {
-    FunctionComponent,
-    ReactElement,
-    useEffect,
-    useState,
-} from 'react';
+import React, { ReactElement, useEffect, useState } from 'react';
 import DashboardNavigation from '../../Utils/Navigation';
 import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import User from 'CommonUI/src/Utils/User';
@@ -21,7 +16,7 @@ import { DASHBOARD_API_URL } from 'CommonUI/src/Config';
 import API from 'CommonUI/src/Utils/API/API';
 import ConfirmModal from 'CommonUI/src/Components/Modal/ConfirmModal';
 
-const Call: FunctionComponent = (): ReactElement => {
+const Call: () => JSX.Element = (): ReactElement => {
     const [showVerificationCodeModal, setShowVerificationCodeModal] =
         useState<boolean>(false);
 
@@ -51,10 +46,10 @@ const Call: FunctionComponent = (): ReactElement => {
                     userId: User.getUserId().toString(),
                 }}
                 refreshToggle={refreshToggle}
-                onBeforeCreate={(model: UserCall): UserCall => {
+                onBeforeCreate={(model: UserCall): Promise<UserCall> => {
                     model.projectId = DashboardNavigation.getProjectId()!;
                     model.userId = User.getUserId();
-                    return model;
+                    return Promise.resolve(model);
                 }}
                 createVerb={'Add'}
                 actionButtons={[
@@ -118,7 +113,6 @@ const Call: FunctionComponent = (): ReactElement => {
                 isEditable={false}
                 isCreateable={true}
                 cardProps={{
-                    icon: IconProp.Call,
                     title: 'Phone Numbers for Call Notifications',
                     description:
                         'Manage Phone Numbers that will receive call notifications for this project.',
@@ -168,7 +162,6 @@ const Call: FunctionComponent = (): ReactElement => {
                         setShowVerificationCodeModal(false);
                     }}
                     isLoading={isLoading}
-                    name="Verify Phone Number"
                     submitButtonText={'Verify'}
                     onSubmit={async (item: JSONObject) => {
                         setIsLoading(true);
@@ -201,6 +194,7 @@ const Call: FunctionComponent = (): ReactElement => {
                         }
                     }}
                     formProps={{
+                        name: 'Verify Phone Number',
                         error: error || '',
                         fields: [
                             {

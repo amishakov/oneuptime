@@ -9,10 +9,15 @@ import Loader, { LoaderType } from '../Loader/Loader';
 import { VeryLightGrey } from 'Common/Types/BrandColors';
 import Permission, { PermissionHelper } from 'Common/Types/Permission';
 import PermissionUtil from '../../Utils/Permission';
-import { ColumnAccessControl } from 'Common/Types/Database/AccessControl/AccessControl';
+import { ColumnAccessControl } from 'Common/Types/BaseDatabase/AccessControl';
 import Field from './Field';
+import DetailField from '../Detail/Field';
 import Detail from '../Detail/Detail';
 import API from '../../Utils/API/API';
+import JSONFunctions from 'Common/Types/JSONFunctions';
+import ErrorMessage from '../ErrorMessage/ErrorMessage';
+import { useAsyncEffect } from 'use-async-effect';
+import User from '../../Utils/User';
 
 export interface ComponentProps<TBaseModel extends BaseModel> {
     modelType: { new (): TBaseModel };
@@ -28,10 +33,12 @@ export interface ComponentProps<TBaseModel extends BaseModel> {
     selectMoreFields?: Select<TBaseModel>;
 }
 
-const ModelDetail: Function = <TBaseModel extends BaseModel>(
+const ModelDetail: <TBaseModel extends BaseModel>(
+    props: ComponentProps<TBaseModel>
+) => ReactElement = <TBaseModel extends BaseModel>(
     props: ComponentProps<TBaseModel>
 ): ReactElement => {
-    const [fields, setFields] = useState<Array<Field<TBaseModel>>>([]);
+    const [fields, setFields] = useState<Array<DetailField>>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>('');
     const [item, setItem] = useState<TBaseModel | null>(null);
@@ -93,7 +100,7 @@ const ModelDetail: Function = <TBaseModel extends BaseModel>(
         const accessControl: Dictionary<ColumnAccessControl> =
             model.getColumnAccessControlForAllColumns() || {};
 
-        const fieldsToSet: Array<Field<TBaseModel>> = [];
+        const fieldsToSet: Array<DetailField> = [];
 
         for (const field of props.fields) {
             const keys: Array<string> = Object.keys(
@@ -107,16 +114,17 @@ const ModelDetail: Function = <TBaseModel extends BaseModel>(
 
                 fieldPermissions = accessControl[key]?.read || [];
 
-                if (
+                const hasPermissions: boolean =
                     fieldPermissions &&
                     PermissionHelper.doesPermissionsIntersect(
                         userPermissions,
                         fieldPermissions
-                    )
-                ) {
-                    field.key = key;
+                    );
+
+                if (hasPermissions || User.isMasterAdmin()) {
                     fieldsToSet.push({
                         ...field,
+                        key: key,
                         getElement: field.getElement
                             ? (item: JSONObject): ReactElement => {
                                   return field.getElement!(
@@ -131,6 +139,7 @@ const ModelDetail: Function = <TBaseModel extends BaseModel>(
             } else {
                 fieldsToSet.push({
                     ...field,
+                    key: '',
                     getElement: field.getElement
                         ? (item: JSONObject): ReactElement => {
                               return field.getElement!(
@@ -153,7 +162,7 @@ const ModelDetail: Function = <TBaseModel extends BaseModel>(
         }
     }, [onBeforeFetchData, props.modelType]);
 
-    const fetchItem: Function = async (): Promise<void> => {
+    const fetchItem: () => Promise<void> = async (): Promise<void> => {
         // get item.
         setIsLoading(true);
         props.onLoadingChange && props.onLoadingChange(true);
@@ -196,9 +205,9 @@ const ModelDetail: Function = <TBaseModel extends BaseModel>(
         props.onLoadingChange && props.onLoadingChange(false);
     };
 
-    useEffect(() => {
+    useAsyncEffect(async () => {
         if (props.modelId && props.modelType) {
-            fetchItem();
+            await fetchItem();
         }
     }, [props.modelId, props.refresher, props.modelType]);
 
@@ -231,8 +240,8 @@ const ModelDetail: Function = <TBaseModel extends BaseModel>(
             >
                 {error} <br />{' '}
                 <span
-                    onClick={() => {
-                        fetchItem();
+                    onClick={async () => {
+                        await fetchItem();
                     }}
                     className="underline primary-on-hover"
                 >
@@ -242,10 +251,14 @@ const ModelDetail: Function = <TBaseModel extends BaseModel>(
         );
     }
 
+    if (!item) {
+        return <ErrorMessage error="Item not found" />;
+    }
+
     return (
         <Detail
             id={props.id}
-            item={item}
+            item={JSONFunctions.toJSONObject(item, props.modelType)}
             fields={fields}
             showDetailsInNumberOfColumns={props.showDetailsInNumberOfColumns}
         />

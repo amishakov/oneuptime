@@ -8,7 +8,6 @@ import DashboardSideMenu from './SideMenu';
 import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
-import IconProp from 'Common/Types/Icon/IconProp';
 import CardModelDetail from 'CommonUI/src/Components/ModelDetail/CardModelDetail';
 import Team from 'Model/Models/Team';
 import TeamMember from 'Model/Models/TeamMember';
@@ -71,7 +70,6 @@ const TeamView: FunctionComponent<PageComponentProps> = (
                 cardProps={{
                     title: 'Team Details',
                     description: 'Here are more details for this team.',
-                    icon: IconProp.User,
                 }}
                 isEditable={true}
                 formFields={[
@@ -120,7 +118,7 @@ const TeamView: FunctionComponent<PageComponentProps> = (
                             title: 'Description',
                         },
                     ],
-                    modelId: Navigation.getLastParamAsObjectID().toString(),
+                    modelId: Navigation.getLastParamAsObjectID(),
                 }}
             />
 
@@ -147,7 +145,6 @@ const TeamView: FunctionComponent<PageComponentProps> = (
                     return Promise.resolve(item);
                 }}
                 cardProps={{
-                    icon: IconProp.User,
                     title: 'Team Members',
                     description:
                         'See a list of members or invite them to this team. ',
@@ -242,7 +239,6 @@ const TeamView: FunctionComponent<PageComponentProps> = (
                     return Promise.resolve(item);
                 }}
                 cardProps={{
-                    icon: IconProp.Lock,
                     title: 'Team Permissions',
                     description:
                         'Add different permisisons to this team to make it more granular.',
@@ -253,7 +249,10 @@ const TeamView: FunctionComponent<PageComponentProps> = (
                         field: {
                             permission: true,
                         },
-                        onChange: async (_value: any, form: any) => {
+                        onChange: async (
+                            _value: any,
+                            form: any
+                        ): Promise<void> => {
                             await form.setFieldValue('labels', [], true);
                         },
                         title: 'Permission',

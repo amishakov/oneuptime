@@ -15,16 +15,20 @@ import ObjectID from 'Common/Types/ObjectID';
 import { JSONObject } from 'Common/Types/JSON';
 import JSONFunctions from 'Common/Types/JSONFunctions';
 import CreateBy from '../Types/Database/CreateBy';
-import DatabaseCommonInteractionProps from 'Common/Types/Database/DatabaseCommonInteractionProps';
+import DatabaseCommonInteractionProps from 'Common/Types/BaseDatabase/DatabaseCommonInteractionProps';
 import Query from '../Types/Database/Query';
 import Select from '../Types/Database/Select';
 import Sort from '../Types/Database/Sort';
-import { LIMIT_PER_PROJECT } from 'Common/Types/Database/LimitMax';
+import {
+    DEFAULT_LIMIT,
+    LIMIT_PER_PROJECT,
+} from 'Common/Types/Database/LimitMax';
 import PartialEntity from 'Common/Types/Database/PartialEntity';
 import { UserPermission } from 'Common/Types/Permission';
-import { IsBillingEnabled } from '../Config';
+import { IsBillingEnabled } from '../EnvironmentConfig';
 import ProjectService from '../Services/ProjectService';
 import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
+import UserType from 'Common/Types/UserType';
 
 export default class BaseAPI<
     TBaseModel extends BaseModel,
@@ -261,6 +265,12 @@ export default class BaseAPI<
             props.isSubscriptionUnpaid = plan.isSubscriptionUnpaid;
         }
 
+        // check for root permissions.
+
+        if (props.userType === UserType.MasterAdmin) {
+            props.isMasterAdmin = true;
+        }
+
         return props;
     }
 
@@ -276,7 +286,7 @@ export default class BaseAPI<
 
         const limit: PositiveNumber = req.query['limit']
             ? new PositiveNumber(req.query['limit'] as string)
-            : new PositiveNumber(10);
+            : new PositiveNumber(DEFAULT_LIMIT);
 
         if (limit.toNumber() > LIMIT_PER_PROJECT) {
             throw new BadRequestException(

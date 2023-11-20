@@ -13,6 +13,7 @@ import { SMSMessage } from 'Common/Types/SMS/SMS';
 import { CallRequestMessage } from 'Common/Types/Call/CallRequest';
 import UserNotificationSettingService from 'CommonServer/Services/UserNotificationSettingService';
 import NotificationSettingEventType from 'Common/Types/NotificationSetting/NotificationSettingEventType';
+import Monitor from 'Model/Models/Monitor';
 
 RunCron(
     'IncidentOwner:SendCreatedResourceEmail',
@@ -43,6 +44,9 @@ RunCron(
                     name: true,
                 },
                 rootCause: true,
+                monitors: {
+                    name: true,
+                },
             },
         });
 
@@ -83,13 +87,21 @@ RunCron(
                 incidentDescription: Markdown.convertToHTML(
                     incident.description! || ''
                 ),
+                resourcesAffected:
+                    incident
+                        .monitors!.map((monitor: Monitor) => {
+                            return monitor.name!;
+                        })
+                        .join(', ') || 'None',
                 incidentSeverity: incident.incidentSeverity!.name!,
                 rootCause:
                     incident.rootCause ||
                     'No root cause identified for this incident',
-                incidentViewLink: IncidentService.getIncidentLinkInDashboard(
-                    incident.projectId!,
-                    incident.id!
+                incidentViewLink: (
+                    await IncidentService.getIncidentLinkInDashboard(
+                        incident.projectId!,
+                        incident.id!
+                    )
                 ).toString(),
             };
 

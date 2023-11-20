@@ -24,14 +24,22 @@ import ColumnAccessControl from 'Common/Types/Database/AccessControl/ColumnAcces
 import TenantColumn from 'Common/Types/Database/TenantColumn';
 import CanAccessIfCanReadOn from 'Common/Types/Database/CanAccessIfCanReadOn';
 import TableMetadata from 'Common/Types/Database/TableMetadata';
-import EnableWorkflow from 'Common/Types/Model/EnableWorkflow';
+import EnableWorkflow from 'Common/Types/Database/EnableWorkflow';
 import IconProp from 'Common/Types/Icon/IconProp';
 import StatusPage from './StatusPage';
-import EnableDocumentation from 'Common/Types/Model/EnableDocumentation';
+import EnableDocumentation from 'Common/Types/Database/EnableDocumentation';
+import TableBillingAccessControl from 'Common/Types/Database/AccessControl/TableBillingAccessControl';
+import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
 
 @EnableDocumentation()
 @TenantColumn('projectId')
 @CanAccessIfCanReadOn('statusPages')
+@TableBillingAccessControl({
+    create: PlanSelect.Growth,
+    read: PlanSelect.Free,
+    update: PlanSelect.Growth,
+    delete: PlanSelect.Free,
+})
 @TableAccessControl({
     create: [
         Permission.ProjectOwner,

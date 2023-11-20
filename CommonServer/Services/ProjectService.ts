@@ -1,11 +1,7 @@
 import PostgresDatabase from '../Infrastructure/PostgresDatabase';
 import Model from 'Model/Models/Project';
-import DatabaseService, {
-    OnCreate,
-    OnDelete,
-    OnFind,
-    OnUpdate,
-} from './DatabaseService';
+import DatabaseService from './DatabaseService';
+import { OnCreate, OnUpdate, OnDelete, OnFind } from '../Types/Database/Hooks';
 import CreateBy from '../Types/Database/CreateBy';
 import NotAuthorizedException from 'Common/Types/Exception/NotAuthorizedException';
 import TeamService from './TeamService';
@@ -30,7 +26,7 @@ import IncidentSeverity from 'Model/Models/IncidentSeverity';
 import IncidentSeverityService from './IncidentSeverityService';
 import ScheduledMaintenanceState from 'Model/Models/ScheduledMaintenanceState';
 import ScheduledMaintenanceStateService from './ScheduledMaintenanceStateService';
-import { getAllEnvVars, IsBillingEnabled } from '../Config';
+import { getAllEnvVars, IsBillingEnabled } from '../EnvironmentConfig';
 import BillingService from './BillingService';
 import DeleteBy from '../Types/Database/DeleteBy';
 import LIMIT_MAX from 'Common/Types/Database/LimitMax';
@@ -49,6 +45,10 @@ import EmailTemplateType from 'Common/Types/Email/EmailTemplateType';
 import UserService from './UserService';
 import UserNotificationRuleService from './UserNotificationRuleService';
 import UserNotificationSettingService from './UserNotificationSettingService';
+import PromoCode from 'Model/Models/PromoCode';
+import PromoCodeService from './PromoCodeService';
+import Color from 'Common/Types/Color';
+import SubscriptionStatus from 'Common/Types/Billing/SubscriptionStatus';
 
 export class Service extends DatabaseService<Model> {
     public constructor(postgresDatabase?: PostgresDatabase) {
@@ -62,20 +62,42 @@ export class Service extends DatabaseService<Model> {
             throw new BadDataException('Project name is required');
         }
 
+        if (data.props.userId) {
+            data.data.createdByUserId = data.props.userId;
+        } else {
+            throw new NotAuthorizedException(
+                'User should be logged in to create the project.'
+            );
+        }
+
+        const user: User | null = await UserService.findOneById({
+            id: data.props.userId,
+            select: {
+                name: true,
+                email: true,
+                companyPhoneNumber: true,
+                companyName: true,
+                utmCampaign: true,
+                utmSource: true,
+                utmMedium: true,
+                utmTerm: true,
+                utmContent: true,
+                utmUrl: true,
+            },
+            props: {
+                isRoot: true,
+            },
+        });
+
+        if (!user) {
+            throw new BadDataException('User not found.');
+        }
+
         if (IsBillingEnabled) {
             if (!data.data.paymentProviderPlanId) {
                 throw new BadDataException(
                     'Plan required to create the project.'
                 );
-            }
-
-            if (
-                data.data.paymentProviderPromoCode &&
-                !(await BillingService.isPromoCodeValid(
-                    data.data.paymentProviderPromoCode
-                ))
-            ) {
-                throw new BadDataException('Promo code is invalid.');
             }
 
             if (
@@ -90,6 +112,97 @@ export class Service extends DatabaseService<Model> {
             data.data.planName = SubscriptionPlan.getPlanSelect(
                 data.data.paymentProviderPlanId
             );
+
+            if (data.data.paymentProviderPromoCode) {
+                // check if it exists in promcode table. Not all promocodes are in the table, only reseller ones are.
+                // If they are not in the table, allow projetc creation to proceed.
+                // If they are in the project table, then see if anyn restrictions on reseller plan apply and if it does,
+                // apply those restictions to the project.
+
+                const promoCode: PromoCode | null =
+                    await PromoCodeService.findOneBy({
+                        query: {
+                            promoCodeId: data.data.paymentProviderPromoCode,
+                        },
+                        select: {
+                            isPromoCodeUsed: true,
+                            userEmail: true,
+                            resellerPlan: {
+                                _id: true,
+                                planType: true,
+                                monitorLimit: true,
+                                teamMemberLimit: true,
+                            },
+                            resellerId: true,
+                            resellerLicenseId: true,
+                            planType: true,
+                            resellerPlanId: true,
+                        },
+                        props: {
+                            isRoot: true,
+                        },
+                    });
+
+                if (promoCode) {
+                    // check if the same user is creating the project.
+                    if (
+                        promoCode.userEmail?.toString() !==
+                        user.email?.toString()
+                    ) {
+                        throw new BadDataException(
+                            'This promocode is assigned to a different user and cannot be used.'
+                        );
+                    }
+
+                    if (promoCode.isPromoCodeUsed) {
+                        throw new BadDataException(
+                            'This promocode has already been used.'
+                        );
+                    }
+
+                    if (promoCode.resellerPlan?.monitorLimit) {
+                        data.data.activeMonitorsLimit =
+                            promoCode.resellerPlan?.monitorLimit;
+                    }
+
+                    if (promoCode.resellerPlan?.teamMemberLimit) {
+                        data.data.seatLimit =
+                            promoCode.resellerPlan?.teamMemberLimit;
+                    }
+
+                    if (promoCode.planType !== data.data.planName) {
+                        throw new BadDataException(
+                            'Promocode is not valid for this plan. Please select the ' +
+                                promoCode.planType +
+                                ' plan.'
+                        );
+                    }
+
+                    if (promoCode.resellerLicenseId) {
+                        data.data.resellerLicenseId =
+                            promoCode.resellerLicenseId;
+                    }
+
+                    if (promoCode.resellerId) {
+                        data.data.resellerId = promoCode.resellerId;
+                    }
+
+                    if (promoCode.resellerPlanId) {
+                        data.data.resellerPlanId = promoCode.resellerPlanId;
+                    }
+                }
+            }
+
+            if (
+                data.data.paymentProviderPromoCode &&
+                !(await BillingService.isPromoCodeValid(
+                    data.data.paymentProviderPromoCode
+                ))
+            ) {
+                throw new BadDataException('Promo code is invalid.');
+            }
+
+            // check if promocode is valid.
         }
 
         // check if the user has the project with the same name. If yes, reject.
@@ -124,35 +237,18 @@ export class Service extends DatabaseService<Model> {
             );
         }
 
-        if (data.props.userId) {
-            data.data.createdByUserId = data.props.userId;
-        } else {
-            throw new NotAuthorizedException(
-                'User should be logged in to create the project.'
-            );
-        }
-
-        const user: User | null = await UserService.findOneById({
-            id: data.props.userId,
-            select: {
-                name: true,
-                email: true,
-                companyPhoneNumber: true,
-                companyName: true,
-            },
-            props: {
-                isRoot: true,
-            },
-        });
-
-        if (!user) {
-            throw new BadDataException('User not found.');
-        }
-
         data.data.createdOwnerName = user.name!;
         data.data.createdOwnerEmail = user.email!;
         data.data.createdOwnerPhone = user.companyPhoneNumber!;
         data.data.createdOwnerCompanyName = user.companyName!;
+
+        // UTM info.
+        data.data.utmCampaign = user.utmCampaign!;
+        data.data.utmSource = user.utmSource!;
+        data.data.utmMedium = user.utmMedium!;
+        data.data.utmTerm = user.utmTerm!;
+        data.data.utmContent = user.utmContent!;
+        data.data.utmUrl = user.utmUrl!;
 
         return Promise.resolve({ createBy: data, carryForward: null });
     }
@@ -200,6 +296,8 @@ export class Service extends DatabaseService<Model> {
                     project.paymentProviderPlanId !==
                     updateBy.data.paymentProviderPlanId
                 ) {
+                    logger.info('Changing plan for project ' + project.id);
+
                     const plan: SubscriptionPlan | undefined =
                         SubscriptionPlan.getSubscriptionPlanById(
                             updateBy.data.paymentProviderPlanId! as string,
@@ -210,12 +308,28 @@ export class Service extends DatabaseService<Model> {
                         throw new BadDataException('Invalid plan');
                     }
 
+                    logger.info(
+                        'Changing plan for project ' +
+                            project.id?.toString() +
+                            ' to ' +
+                            plan.getName()
+                    );
+
                     if (!project.paymentProviderSubscriptionSeats) {
                         project.paymentProviderSubscriptionSeats =
                             await TeamMemberService.getUniqueTeamMemberCountInProject(
                                 project.id!
                             );
                     }
+
+                    logger.info(
+                        'Changing plan for project ' +
+                            project.id?.toString() +
+                            ' to ' +
+                            plan.getName() +
+                            ' with seats ' +
+                            project.paymentProviderSubscriptionSeats
+                    );
 
                     const subscription: {
                         subscriptionId: string;
@@ -237,6 +351,16 @@ export class Service extends DatabaseService<Model> {
                         endTrialAt: project.trialEndsAt,
                     });
 
+                    logger.info(
+                        'Changing plan for project ' +
+                            project.id?.toString() +
+                            ' to ' +
+                            plan.getName() +
+                            ' with seats ' +
+                            project.paymentProviderSubscriptionSeats +
+                            ' completed.'
+                    );
+
                     await this.updateOneById({
                         id: new ObjectID(updateBy.query._id! as string),
                         data: {
@@ -254,6 +378,16 @@ export class Service extends DatabaseService<Model> {
                             ignoreHooks: true,
                         },
                     });
+
+                    logger.info(
+                        'Changing plan for project ' +
+                            project.id?.toString() +
+                            ' to ' +
+                            plan.getName() +
+                            ' with seats ' +
+                            project.paymentProviderSubscriptionSeats +
+                            ' completed and project updated.'
+                    );
                 }
             }
         }
@@ -300,6 +434,24 @@ export class Service extends DatabaseService<Model> {
                 },
             });
 
+        let endedScheduledMaintenanceState: ScheduledMaintenanceState =
+            new ScheduledMaintenanceState();
+        endedScheduledMaintenanceState.name = 'Ended';
+        endedScheduledMaintenanceState.description =
+            'Scheduled maintenance events switch to this state when they end.';
+        endedScheduledMaintenanceState.color = new Color('#4A4A4A');
+        endedScheduledMaintenanceState.isEndedState = true;
+        endedScheduledMaintenanceState.projectId = createdItem.id!;
+        endedScheduledMaintenanceState.order = 3;
+
+        endedScheduledMaintenanceState =
+            await ScheduledMaintenanceStateService.create({
+                data: endedScheduledMaintenanceState,
+                props: {
+                    isRoot: true,
+                },
+            });
+
         let completedScheduledMaintenanceState: ScheduledMaintenanceState =
             new ScheduledMaintenanceState();
         completedScheduledMaintenanceState.name = 'Completed';
@@ -308,7 +460,7 @@ export class Service extends DatabaseService<Model> {
         completedScheduledMaintenanceState.color = Green;
         completedScheduledMaintenanceState.isResolvedState = true;
         completedScheduledMaintenanceState.projectId = createdItem.id!;
-        completedScheduledMaintenanceState.order = 3;
+        completedScheduledMaintenanceState.order = 4;
 
         completedScheduledMaintenanceState =
             await ScheduledMaintenanceStateService.create({
@@ -372,6 +524,24 @@ export class Service extends DatabaseService<Model> {
                     isRoot: true,
                 },
             });
+
+            // mark the promo code as used it it exists.
+
+            if (createdItem.paymentProviderPromoCode) {
+                await PromoCodeService.updateOneBy({
+                    query: {
+                        promoCodeId: createdItem.paymentProviderPromoCode,
+                    },
+                    data: {
+                        isPromoCodeUsed: true,
+                        promoCodeUsedAt: OneUptimeDate.getCurrentDate(),
+                        projectId: createdItem.id!,
+                    },
+                    props: {
+                        isRoot: true,
+                    },
+                });
+            }
         }
 
         createdItem = await this.addDefaultIncidentSeverity(createdItem);
@@ -867,6 +1037,110 @@ export class Service extends DatabaseService<Model> {
                 logger.error(err);
             });
         }
+    }
+
+    public async reactiveSubscription(projectId: ObjectID): Promise<void> {
+        logger.info('Reactivating subscription for project ' + projectId);
+
+        const project: Model | null = await this.findOneById({
+            id: projectId!,
+            props: {
+                isRoot: true,
+            },
+            select: {
+                _id: true,
+                paymentProviderCustomerId: true,
+                paymentProviderSubscriptionId: true,
+                paymentProviderMeteredSubscriptionId: true,
+                paymentProviderSubscriptionSeats: true,
+                paymentProviderPlanId: true,
+            },
+        });
+
+        if (!project) {
+            throw new BadDataException('Project not found');
+        }
+
+        if (!project.paymentProviderCustomerId) {
+            throw new BadDataException('Payment Provider customer not found');
+        }
+
+        if (!project.paymentProviderSubscriptionId) {
+            throw new BadDataException(
+                'Payment Provider subscription not found'
+            );
+        }
+
+        if (!project.paymentProviderMeteredSubscriptionId) {
+            throw new BadDataException(
+                'Payment Provider metered subscription not found'
+            );
+        }
+
+        if (!project.paymentProviderSubscriptionSeats) {
+            throw new BadDataException(
+                'Payment Provider subscription seats not found'
+            );
+        }
+
+        if (!project.paymentProviderPlanId) {
+            throw new BadDataException('Payment Provider plan id not found');
+        }
+
+        const subscriptionPlan: SubscriptionPlan | undefined =
+            SubscriptionPlan.getSubscriptionPlanById(
+                project.paymentProviderPlanId,
+                getAllEnvVars()
+            );
+
+        if (!subscriptionPlan) {
+            throw new BadDataException('Subscription plan not found');
+        }
+
+        const result: {
+            subscriptionId: string;
+            meteredSubscriptionId: string;
+            trialEndsAt?: Date | undefined;
+        } = await BillingService.changePlan({
+            projectId: project.id as ObjectID,
+            subscriptionId: project.paymentProviderSubscriptionId,
+            meteredSubscriptionId: project.paymentProviderMeteredSubscriptionId,
+            serverMeteredPlans: AllMeteredPlans,
+            newPlan: subscriptionPlan,
+            quantity: project.paymentProviderSubscriptionSeats,
+            isYearly: SubscriptionPlan.isYearlyPlan(
+                project.paymentProviderPlanId
+            ),
+            endTrialAt: undefined,
+        });
+
+        // refresh subscription status.
+        const subscriptionState: SubscriptionStatus =
+            await BillingService.getSubscriptionStatus(
+                result.subscriptionId as string
+            );
+
+        const meteredSubscriptionState: SubscriptionStatus =
+            await BillingService.getSubscriptionStatus(
+                project.paymentProviderMeteredSubscriptionId as string
+            );
+
+        // now update project with new subscription id.
+
+        await this.updateOneById({
+            id: project.id!,
+            data: {
+                paymentProviderSubscriptionId: result.subscriptionId,
+                paymentProviderMeteredSubscriptionId:
+                    result.meteredSubscriptionId,
+                paymentProviderSubscriptionStatus: subscriptionState,
+                paymentProviderMeteredSubscriptionStatus:
+                    meteredSubscriptionState,
+            },
+            props: {
+                isRoot: true,
+            },
+        });
     }
 }
 export default new Service();

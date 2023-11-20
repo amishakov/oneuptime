@@ -1,4 +1,4 @@
-import React, { FunctionComponent, ReactElement } from 'react';
+import React, { ReactElement } from 'react';
 import Route from 'Common/Types/API/Route';
 import IconProp from 'Common/Types/Icon/IconProp';
 import SideMenu from 'CommonUI/src/Components/SideMenu/SideMenu';
@@ -8,7 +8,7 @@ import RouteMap, { RouteUtil } from '../../Utils/RouteMap';
 import PageMap from '../../Utils/PageMap';
 import { BILLING_ENABLED } from 'CommonUI/src/Config';
 
-const DashboardSideMenu: FunctionComponent = (): ReactElement => {
+const DashboardSideMenu: () => JSX.Element = (): ReactElement => {
     return (
         <SideMenu>
             <SideMenuSection title="Basic">
@@ -104,6 +104,28 @@ const DashboardSideMenu: FunctionComponent = (): ReactElement => {
                 />
                 <SideMenuItem
                     link={{
+                        title: 'Incident Templates',
+                        to: RouteUtil.populateRouteParams(
+                            RouteMap[
+                                PageMap.SETTINGS_INCIDENT_TEMPLATES
+                            ] as Route
+                        ),
+                    }}
+                    icon={IconProp.Template}
+                />
+                <SideMenuItem
+                    link={{
+                        title: 'Note Templates',
+                        to: RouteUtil.populateRouteParams(
+                            RouteMap[
+                                PageMap.SETTINGS_INCIDENT_NOTE_TEMPLATES
+                            ] as Route
+                        ),
+                    }}
+                    icon={IconProp.Pencil}
+                />
+                <SideMenuItem
+                    link={{
                         title: 'Custom Fields',
                         to: RouteUtil.populateRouteParams(
                             RouteMap[
@@ -132,6 +154,18 @@ const DashboardSideMenu: FunctionComponent = (): ReactElement => {
                         ),
                     }}
                     icon={IconProp.Clock}
+                />
+                <SideMenuItem
+                    link={{
+                        title: 'Note Templates',
+                        to: RouteUtil.populateRouteParams(
+                            RouteMap[
+                                PageMap
+                                    .SETTINGS_SCHEDULED_MAINTENANCE_NOTE_TEMPLATES
+                            ] as Route
+                        ),
+                    }}
+                    icon={IconProp.Pencil}
                 />
                 <SideMenuItem
                     link={{
@@ -231,6 +265,15 @@ const DashboardSideMenu: FunctionComponent = (): ReactElement => {
                         ),
                     }}
                     icon={IconProp.Terminal}
+                />
+                <SideMenuItem
+                    link={{
+                        title: 'Feature Flags',
+                        to: RouteUtil.populateRouteParams(
+                            RouteMap[PageMap.SETTINGS_FEATURE_FLAGS] as Route
+                        ),
+                    }}
+                    icon={IconProp.Flag}
                 />
 
                 {/* <SideMenuItem

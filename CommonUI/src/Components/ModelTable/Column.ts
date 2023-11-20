@@ -16,17 +16,18 @@ export interface ActionButton {
     onClick: (id: ObjectID) => void;
 }
 
-export default interface Columns<TEntity> {
+export default interface Columns<TEntity extends BaseModel> {
     field?: SelectEntityField<TEntity>;
     selectedProperty?: string;
     title: string;
     contentClassName?: string | undefined;
     colSpan?: number | undefined;
     disableSort?: boolean;
+    description?: string | undefined;
     type: FieldType;
-    isFilterable: boolean;
-    filterEntityType?: { new (): BaseModel } | undefined;
-    filterQuery?: Query<BaseModel> | undefined;
+    isFilterable?: boolean | undefined;
+    filterEntityType?: { new (): TEntity } | undefined;
+    filterQuery?: Query<TEntity> | undefined;
     tooltipText?: ((item: TEntity) => string) | undefined;
     filterDropdownField?:
         | {

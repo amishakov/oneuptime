@@ -1,5 +1,4 @@
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
-import IconProp from 'Common/Types/Icon/IconProp';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import React, { FunctionComponent, ReactElement } from 'react';
 import ScheduledMaintenance from 'Model/Models/ScheduledMaintenance';
@@ -40,12 +39,11 @@ const ScheduledMaintenancesTable: FunctionComponent<ComponentProps> = (
             id="scheduledMaintenances-table"
             name="Scheduled Maintenance Events"
             isDeleteable={false}
-            query={props.query}
+            query={props.query || {}}
             isEditable={false}
             isCreateable={true}
             isViewable={true}
             cardProps={{
-                icon: IconProp.Clock,
                 title: props.title || 'Scheduled Maintenance Events',
                 description:
                     props.description ||
@@ -180,7 +178,7 @@ const ScheduledMaintenancesTable: FunctionComponent<ComponentProps> = (
                     placeholder: 'Select Status Pages',
                 },
                 {
-                    field: {
+                    overrideField: {
                         ownerTeams: true,
                     },
                     forceShow: true,
@@ -199,7 +197,7 @@ const ScheduledMaintenancesTable: FunctionComponent<ComponentProps> = (
                     overrideFieldKey: 'ownerTeams',
                 },
                 {
-                    field: {
+                    overrideField: {
                         ownerUsers: true,
                     },
                     forceShow: true,
@@ -236,6 +234,7 @@ const ScheduledMaintenancesTable: FunctionComponent<ComponentProps> = (
                 },
             ]}
             showViewIdButton={true}
+            viewButtonText="View Event"
             showRefreshButton={true}
             showFilterButton={true}
             viewPageRoute={props.viewPageRoute}

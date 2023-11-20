@@ -8,7 +8,6 @@ import SideMenu from './SideMenu';
 import ObjectID from 'Common/Types/ObjectID';
 import StatusPage from 'Model/Models/StatusPage';
 import CardModelDetail from 'CommonUI/src/Components/ModelDetail/CardModelDetail';
-import IconProp from 'Common/Types/Icon/IconProp';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import Navigation from 'CommonUI/src/Utils/Navigation';
@@ -63,7 +62,6 @@ const StatusPageDelete: FunctionComponent<PageComponentProps> = (
                     title: 'Header HTML',
                     description:
                         'You can include header HTML to your status page.',
-                    icon: IconProp.Code,
                 }}
                 isEditable={true}
                 formFields={[
@@ -103,7 +101,6 @@ const StatusPageDelete: FunctionComponent<PageComponentProps> = (
                     title: 'Footer HTML',
                     description:
                         'You can include footer HTML to your status page.',
-                    icon: IconProp.Code,
                 }}
                 isEditable={true}
                 formFields={[
@@ -143,7 +140,6 @@ const StatusPageDelete: FunctionComponent<PageComponentProps> = (
                     title: 'Custom CSS',
                     description:
                         'You can include custom CSS classes to your status page.',
-                    icon: IconProp.Code,
                 }}
                 isEditable={true}
                 formFields={[
@@ -183,7 +179,6 @@ const StatusPageDelete: FunctionComponent<PageComponentProps> = (
                     title: 'Custom JavaScript',
                     description:
                         'You can include custom JavaScript classes to your status page.',
-                    icon: IconProp.Code,
                 }}
                 isEditable={true}
                 formFields={[

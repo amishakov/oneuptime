@@ -9,8 +9,7 @@ import Page from '../../Components/Page/Page';
 import URL from 'Common/Types/API/URL';
 import JSONFunctions from 'Common/Types/JSONFunctions';
 import PageLoader from 'CommonUI/src/Components/Loader/PageLoader';
-import BaseAPI from 'CommonUI/src/Utils/API/API';
-import { DASHBOARD_API_URL } from 'CommonUI/src/Config';
+
 import useAsyncEffect from 'use-async-effect';
 import { JSONArray, JSONObject } from 'Common/Types/JSON';
 import ErrorMessage from 'CommonUI/src/Components/ErrorMessage/ErrorMessage';
@@ -21,7 +20,6 @@ import EventHistoryList, {
     ComponentProps as EventHistoryListComponentProps,
 } from 'CommonUI/src/Components/EventHistoryList/EventHistoryList';
 import { ComponentProps as EventHistoryDayListComponentProps } from 'CommonUI/src/Components/EventHistoryList/EventHistoryDayList';
-import StatusPageResource from 'Model/Models/StatusPageResource';
 import OneUptimeDate from 'Common/Types/Date';
 import Dictionary from 'Common/Types/Dictionary';
 import StatusPageAnnouncement from 'Model/Models/StatusPageAnnouncement';
@@ -35,19 +33,21 @@ import PageMap from '../../Utils/PageMap';
 import API from '../../Utils/API';
 import StatusPageUtil from '../../Utils/StatusPage';
 import HTTPErrorResponse from 'Common/Types/API/HTTPErrorResponse';
+import { STATUS_PAGE_API_URL } from '../../Utils/Config';
+import Section from '../../Components/Section/Section';
 
 const Overview: FunctionComponent<PageComponentProps> = (
     props: PageComponentProps
 ): ReactElement => {
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [_statusPageResources, setStatusPageResources] = useState<
-        Array<StatusPageResource>
-    >([]);
     const [announcements, setAnnouncements] = useState<
         Array<StatusPageAnnouncement>
     >([]);
-    const [parsedData, setParsedData] =
+
+    const [activeAnnounementsParsedData, setActiveAnnouncementsParsedData] =
+        useState<EventHistoryListComponentProps | null>(null);
+    const [pastAnnouncementsParsedData, setPastAnnouncementsParsedData] =
         useState<EventHistoryListComponentProps | null>(null);
 
     StatusPageUtil.checkIfUserHasLoggedIn();
@@ -66,13 +66,17 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 throw new BadDataException('Status Page ID is required');
             }
             const response: HTTPResponse<JSONObject> =
-                await BaseAPI.post<JSONObject>(
-                    URL.fromString(DASHBOARD_API_URL.toString()).addRoute(
-                        `/status-page/announcements/${id.toString()}`
+                await API.post<JSONObject>(
+                    URL.fromString(STATUS_PAGE_API_URL.toString()).addRoute(
+                        `/announcements/${id.toString()}`
                     ),
                     {},
                     API.getDefaultHeaders(StatusPageUtil.getStatusPageId()!)
                 );
+
+            if (!response.isSuccess()) {
+                throw response;
+            }
             const data: JSONObject = response.data;
 
             const announcements: Array<StatusPageAnnouncement> =
@@ -80,35 +84,25 @@ const Overview: FunctionComponent<PageComponentProps> = (
                     (data['announcements'] as JSONArray) || [],
                     StatusPageAnnouncement
                 );
-            const statusPageResources: Array<StatusPageResource> =
-                JSONFunctions.fromJSONArray(
-                    (data['statusPageResources'] as JSONArray) || [],
-                    StatusPageResource
-                );
 
             // save data. set()
 
             setAnnouncements(announcements);
-            setStatusPageResources(statusPageResources);
 
             setIsLoading(false);
             props.onLoadComplete();
         } catch (err) {
             if (err instanceof HTTPErrorResponse) {
-                StatusPageUtil.checkIfTheUserIsAuthenticated(err);
+                await StatusPageUtil.checkIfTheUserIsAuthenticated(err);
             }
-            setError(BaseAPI.getFriendlyMessage(err));
+            setError(API.getFriendlyMessage(err));
             setIsLoading(false);
         }
     }, []);
 
-    useEffect(() => {
-        if (isLoading) {
-            // parse data;
-            setParsedData(null);
-            return;
-        }
-
+    const getAnouncementsParsedData: Function = (
+        announcements: Array<StatusPageAnnouncement>
+    ): EventHistoryListComponentProps => {
         const eventHistoryListComponentProps: EventHistoryListComponentProps = {
             items: [],
         };
@@ -141,8 +135,39 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 days[key] as EventHistoryDayListComponentProps
             );
         }
+        return eventHistoryListComponentProps;
+    };
 
-        setParsedData(eventHistoryListComponentProps);
+    useEffect(() => {
+        if (isLoading) {
+            // parse data;
+            setActiveAnnouncementsParsedData(null);
+            setPastAnnouncementsParsedData(null);
+            return;
+        }
+
+        const activeAnnouncement: Array<StatusPageAnnouncement> =
+            announcements.filter((announcement: StatusPageAnnouncement) => {
+                return OneUptimeDate.isBefore(
+                    OneUptimeDate.getCurrentDate(),
+                    announcement.endAnnouncementAt!
+                );
+            });
+
+        const pastAnnouncement: Array<StatusPageAnnouncement> =
+            announcements.filter((announcement: StatusPageAnnouncement) => {
+                return OneUptimeDate.isAfter(
+                    OneUptimeDate.getCurrentDate(),
+                    announcement.endAnnouncementAt!
+                );
+            });
+
+        setActiveAnnouncementsParsedData(
+            getAnouncementsParsedData(activeAnnouncement)
+        );
+        setPastAnnouncementsParsedData(
+            getAnouncementsParsedData(pastAnnouncement)
+        );
     }, [isLoading]);
 
     if (isLoading) {
@@ -151,10 +176,6 @@ const Overview: FunctionComponent<PageComponentProps> = (
 
     if (error) {
         return <ErrorMessage error={error} />;
-    }
-
-    if (!parsedData) {
-        return <PageLoader isVisible={true} />;
     }
 
     return (
@@ -181,14 +202,34 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 },
             ]}
         >
-            {announcements && announcements.length > 0 ? (
-                <EventHistoryList {...parsedData} />
+            {activeAnnounementsParsedData?.items &&
+            activeAnnounementsParsedData?.items.length > 0 ? (
+                <div>
+                    <Section title="Active Announcements" />
+
+                    <EventHistoryList
+                        items={activeAnnounementsParsedData?.items || []}
+                    />
+                </div>
+            ) : (
+                <></>
+            )}
+
+            {pastAnnouncementsParsedData?.items &&
+            pastAnnouncementsParsedData?.items.length > 0 ? (
+                <div>
+                    <Section title="Past Announcements" />
+                    <EventHistoryList
+                        items={pastAnnouncementsParsedData?.items || []}
+                    />
+                </div>
             ) : (
                 <></>
             )}
 
             {announcements.length === 0 ? (
                 <EmptyState
+                    id="announcements-empty-state"
                     title={'No Announcements'}
                     description={'No announcements posted so far on this page.'}
                     icon={IconProp.Announcement}

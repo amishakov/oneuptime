@@ -1,6 +1,7 @@
 import PostgresDatabase from '../Infrastructure/PostgresDatabase';
-import DatabaseService, { OnCreate } from './DatabaseService';
-import DatabaseCommonInteractionProps from 'Common/Types/Database/DatabaseCommonInteractionProps';
+import DatabaseService from './DatabaseService';
+import { OnCreate } from '../Types/Database/Hooks';
+import DatabaseCommonInteractionProps from 'Common/Types/BaseDatabase/DatabaseCommonInteractionProps';
 import ObjectID from 'Common/Types/ObjectID';
 import PositiveNumber from 'Common/Types/PositiveNumber';
 import StatusPage from 'Model/Models/StatusPage';
@@ -8,7 +9,7 @@ import StatusPageDomain from 'Model/Models/StatusPageDomain';
 import StatusPageDomainService from './StatusPageDomainService';
 import URL from 'Common/Types/API/URL';
 import { LIMIT_PER_PROJECT } from 'Common/Types/Database/LimitMax';
-import { DashboardUrl, Domain, HttpProtocol } from '../Config';
+import DatabaseConfig from '../DatabaseConfig';
 import { ExpressRequest } from '../Utils/Express';
 import JSONWebToken from '../Utils/JsonWebToken';
 import JSONWebTokenData from 'Common/Types/JsonWebTokenData';
@@ -21,6 +22,9 @@ import StatusPageOwnerUserService from './StatusPageOwnerUserService';
 import User from 'Model/Models/User';
 import TeamMemberService from './TeamMemberService';
 import BadDataException from 'Common/Types/Exception/BadDataException';
+import Hostname from 'Common/Types/API/Hostname';
+import Protocol from 'Common/Types/API/Protocol';
+import CookieUtil from '../Utils/Cookie';
 
 export class Service extends DatabaseService<StatusPage> {
     public constructor(postgresDatabase?: PostgresDatabase) {
@@ -170,11 +174,13 @@ export class Service extends DatabaseService<StatusPage> {
         }
     }
 
-    public getStatusPageLinkInDashboard(
+    public async getStatusPageLinkInDashboard(
         projectId: ObjectID,
         statusPageId: ObjectID
-    ): URL {
-        return URL.fromString(DashboardUrl.toString()).addRoute(
+    ): Promise<URL> {
+        const dahboardUrl: URL = await DatabaseConfig.getDashboardUrl();
+
+        return URL.fromString(dahboardUrl.toString()).addRoute(
             `/${projectId.toString()}/status-pages/${statusPageId.toString()}`
         );
     }
@@ -186,8 +192,10 @@ export class Service extends DatabaseService<StatusPage> {
     ): Promise<boolean> {
         try {
             // token decode.
-            const token: string | Array<string> | undefined =
-                req.headers['status-page-token'];
+            const token: string | undefined = CookieUtil.getCookie(
+                req,
+                CookieUtil.getUserTokenKey(statusPageId)
+            );
 
             if (token) {
                 try {
@@ -271,8 +279,13 @@ export class Service extends DatabaseService<StatusPage> {
             .join(', ');
 
         if (domains.length === 0) {
+            const host: Hostname = await DatabaseConfig.getHost();
+
+            const httpProtocol: Protocol =
+                await DatabaseConfig.getHttpProtocol();
+
             // 'https://local.oneuptime.com/status-page/40092fb5-cc33-4995-b532-b4e49c441c98'
-            statusPageURL = new URL(HttpProtocol, Domain)
+            statusPageURL = new URL(httpProtocol, host)
                 .addRoute('/status-page/' + statusPageId.toString())
                 .toString();
         }
@@ -303,8 +316,13 @@ export class Service extends DatabaseService<StatusPage> {
         let statusPageURL: string = '';
 
         if (domains.length === 0) {
+            const host: Hostname = await DatabaseConfig.getHost();
+
+            const httpProtocol: Protocol =
+                await DatabaseConfig.getHttpProtocol();
+
             // 'https://local.oneuptime.com/status-page/40092fb5-cc33-4995-b532-b4e49c441c98'
-            statusPageURL = new URL(HttpProtocol, Domain)
+            statusPageURL = new URL(httpProtocol, host)
                 .addRoute('/status-page/' + statusPageId.toString())
                 .toString();
         } else {

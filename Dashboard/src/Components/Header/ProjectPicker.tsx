@@ -16,6 +16,8 @@ import SubscriptionPlan from 'Common/Types/Billing/SubscriptionPlan';
 import Field from 'CommonUI/src/Components/Forms/Types/Field';
 import { RadioButton } from 'CommonUI/src/Components/RadioButtons/RadioButtons';
 import Toggle from 'CommonUI/src/Components/Toggle/Toggle';
+import LocalStorage from 'CommonUI/src/Utils/LocalStorage';
+import { JSONValue } from 'Common/Types/JSON';
 
 export interface ComponentProps {
     projects: Array<Project>;
@@ -31,6 +33,23 @@ const DashboardProjectPicker: FunctionComponent<ComponentProps> = (
     const [selectedProject, setSelectedProject] = useState<Project | null>(
         null
     );
+
+    const [initialValues, setInitialValues] = useState<any>({});
+
+    useEffect(() => {
+        // check if promocode exists in localstorage and if it does, add it to initialValues.
+        const promoCode: JSONValue = LocalStorage.getItem('promoCode');
+
+        if (promoCode) {
+            setInitialValues({
+                paymentProviderPromoCode: promoCode,
+            });
+        }
+    }, []);
+
+    useEffect(() => {
+        refreshFields();
+    }, [initialValues]);
 
     const getFooter: Function = (): ReactElement => {
         if (!BILLING_ENABLED) {
@@ -116,7 +135,7 @@ const DashboardProjectPicker: FunctionComponent<ComponentProps> = (
                     name: true,
                 },
                 validation: {
-                    minLength: 6,
+                    minLength: 4,
                 },
                 fieldType: FormFieldSchemaType.Text,
                 placeholder: 'My Project',
@@ -210,6 +229,7 @@ const DashboardProjectPicker: FunctionComponent<ComponentProps> = (
                     title: 'Promo Code',
                     required: false,
                     stepId: 'plan',
+                    disabled: Boolean(initialValues.paymentProviderPromoCode),
                 },
             ];
         }
@@ -236,6 +256,7 @@ const DashboardProjectPicker: FunctionComponent<ComponentProps> = (
             {showModal ? (
                 <ModelFormModal<Project>
                     modelType={Project}
+                    initialValues={initialValues}
                     name="Create New Project"
                     title="Create New Project"
                     description="Please create a new OneUptime project to get started."
@@ -244,7 +265,8 @@ const DashboardProjectPicker: FunctionComponent<ComponentProps> = (
                         props.onProjectModalClose();
                     }}
                     submitButtonText="Create Project"
-                    onSuccess={(project: Project) => {
+                    onSuccess={(project: Project | null) => {
+                        LocalStorage.removeItem('promoCode');
                         setSelectedProject(project);
                         if (project && props.onProjectSelected) {
                             props.onProjectSelected(project);
@@ -253,6 +275,7 @@ const DashboardProjectPicker: FunctionComponent<ComponentProps> = (
                         props.onProjectModalClose();
                     }}
                     formProps={{
+                        name: 'Create New Project',
                         steps: BILLING_ENABLED
                             ? [
                                   {
@@ -268,7 +291,7 @@ const DashboardProjectPicker: FunctionComponent<ComponentProps> = (
                         saveRequestOptions: {
                             isMultiTenantRequest: true, // because this is a tenant request, we do not have to include the header in the request
                         },
-                        model: new Project(),
+                        modelType: Project,
                         id: 'create-project-from',
                         fields: [...fields],
                         formType: FormType.Create,

@@ -2,7 +2,7 @@ import React, { ReactElement, useEffect, useRef, useState } from 'react';
 import { ButtonStyleType } from '../Button/Button';
 import Modal from '../Modal/Modal';
 import BasicForm, {
-    ComponentProps as BasicFormComponentProps,
+    BaseComponentProps as BasicFormComponentProps,
 } from '../Forms/BasicForm';
 import ButtonType from '../Button/ButtonTypes';
 import ComponentLoader from '../ComponentLoader/ComponentLoader';
@@ -18,7 +18,9 @@ export interface ComponentProps<T extends Object> {
     description?: string | undefined;
 }
 
-const BasicFormModal: Function = <T extends Object>(
+const BasicFormModal: <T extends Object>(
+    props: ComponentProps<T>
+) => ReactElement = <T extends Object>(
     props: ComponentProps<T>
 ): ReactElement => {
     const [isLoading, setIsLoading] = useState<boolean>(

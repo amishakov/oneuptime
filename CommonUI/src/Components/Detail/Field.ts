@@ -13,11 +13,11 @@ export interface DetailSideLink {
     openLinkInNewTab?: boolean;
 }
 
-export default interface Field {
+export interface FieldBase {
     title?: string;
     description?: string;
     fieldTitleSize?: Size | undefined;
-    key: string;
+
     fieldType?: FieldType;
     dropdownOptions?: Array<DropdownOption> | undefined;
     colSpan?: number | undefined;
@@ -26,8 +26,8 @@ export default interface Field {
     getElement?:
         | ((
               item: JSONObject,
-              miscProps?: JSONObject | undefined,
-              callback?: Function | undefined
+              onBeforeFetchData?: JSONObject,
+              fetchItems?: Function
           ) => ReactElement)
         | undefined;
     sideLink?: DetailSideLink | undefined;
@@ -37,4 +37,8 @@ export default interface Field {
               isCopyable?: boolean | undefined;
           }
         | undefined;
+}
+
+export default interface Field extends FieldBase {
+    key: string;
 }

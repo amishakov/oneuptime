@@ -6,7 +6,7 @@ import PingMonitor, { PingResponse } from './MonitorTypes/PingMonitor';
 import API from 'Common/Utils/API';
 import HTTPMethod from 'Common/Types/API/HTTPMethod';
 import URL from 'Common/Types/API/URL';
-import { PROBE_API_URL } from '../../Config';
+import { INGESTOR_URL } from '../../Config';
 import ProbeAPIRequest from '../ProbeAPIRequest';
 import { JSONObject } from 'Common/Types/JSON';
 import WebsiteMonitor, {
@@ -22,8 +22,8 @@ import { CheckOn, CriteriaFilter } from 'Common/Types/Monitor/CriteriaFilter';
 export default class MonitorUtil {
     public static async probeMonitor(
         monitor: Monitor
-    ): Promise<Array<ProbeMonitorResponse>> {
-        const results: Array<ProbeMonitorResponse> = [];
+    ): Promise<Array<ProbeMonitorResponse | null>> {
+        const results: Array<ProbeMonitorResponse | null> = [];
 
         if (
             !monitor.monitorSteps ||
@@ -39,25 +39,25 @@ export default class MonitorUtil {
                 continue;
             }
 
-            const result: ProbeMonitorResponse = await this.probeMonitorStep(
-                monitorStep,
-                monitor
-            );
+            const result: ProbeMonitorResponse | null =
+                await this.probeMonitorStep(monitorStep, monitor);
 
-            // report this back to Probe API.
+            if (result) {
+                // report this back to Probe API.
 
-            await API.fetch<JSONObject>(
-                HTTPMethod.POST,
-                URL.fromString(PROBE_API_URL.toString()).addRoute(
-                    '/probe/response/ingest'
-                ),
-                {
-                    ...ProbeAPIRequest.getDefaultRequestBody(),
-                    probeMonitorResponse: result as any,
-                },
-                {},
-                {}
-            );
+                await API.fetch<JSONObject>(
+                    HTTPMethod.POST,
+                    URL.fromString(INGESTOR_URL.toString()).addRoute(
+                        '/probe/response/ingest'
+                    ),
+                    {
+                        ...ProbeAPIRequest.getDefaultRequestBody(),
+                        probeMonitorResponse: result as any,
+                    },
+                    {},
+                    {}
+                );
+            }
 
             results.push(result);
         }
@@ -95,7 +95,10 @@ export default class MonitorUtil {
                         criteria.data?.filters;
 
                     for (const filter of filters) {
-                        if (filter.checkOn === CheckOn.ResponseBody) {
+                        if (
+                            filter.checkOn === CheckOn.ResponseBody ||
+                            filter.checkOn === CheckOn.JavaScriptExpression
+                        ) {
                             return false;
                         }
                     }
@@ -109,11 +112,12 @@ export default class MonitorUtil {
     public static async probeMonitorStep(
         monitorStep: MonitorStep,
         monitor: Monitor
-    ): Promise<ProbeMonitorResponse> {
+    ): Promise<ProbeMonitorResponse | null> {
         const result: ProbeMonitorResponse = {
             monitorStepId: monitorStep.id,
             monitorId: monitor.id!,
             probeId: ProbeUtil.getProbeId(),
+            failureCause: '',
         };
 
         if (!monitorStep.data || !monitorStep.data?.monitorDestination) {
@@ -124,27 +128,44 @@ export default class MonitorUtil {
             monitor.monitorType === MonitorType.Ping ||
             monitor.monitorType === MonitorType.IP
         ) {
-            const response: PingResponse = await PingMonitor.ping(
-                monitorStep.data?.monitorDestination
+            const response: PingResponse | null = await PingMonitor.ping(
+                monitorStep.data?.monitorDestination,
+                {
+                    retry: 5,
+                    monitorId: monitor.id!,
+                }
             );
+
+            if (!response) {
+                return null;
+            }
 
             result.isOnline = response.isOnline;
             result.responseTimeInMs = response.responseTimeInMS?.toNumber();
+            result.failureCause = response.failureCause;
         }
 
         if (monitor.monitorType === MonitorType.Website) {
-            const response: ProbeWebsiteResponse = await WebsiteMonitor.ping(
-                monitorStep.data?.monitorDestination as URL,
-                {
-                    isHeadRequest: MonitorUtil.isHeadRequest(monitorStep),
-                }
-            );
+            const response: ProbeWebsiteResponse | null =
+                await WebsiteMonitor.ping(
+                    monitorStep.data?.monitorDestination as URL,
+                    {
+                        isHeadRequest: MonitorUtil.isHeadRequest(monitorStep),
+                        monitorId: monitor.id!,
+                        retry: 5,
+                    }
+                );
+
+            if (!response) {
+                return null;
+            }
 
             result.isOnline = response.isOnline;
             result.responseTimeInMs = response.responseTimeInMS?.toNumber();
             result.responseBody = response.responseBody?.toString();
             result.responseHeaders = response.responseHeaders;
             result.responseCode = response.statusCode;
+            result.failureCause = response.failureCause;
         }
 
         if (monitor.monitorType === MonitorType.API) {
@@ -158,22 +179,29 @@ export default class MonitorUtil {
                 );
             }
 
-            const response: APIResponse = await ApiMonitor.ping(
+            const response: APIResponse | null = await ApiMonitor.ping(
                 monitorStep.data?.monitorDestination as URL,
                 {
                     requestHeaders: monitorStep.data?.requestHeaders || {},
                     requestBody: requestBody || undefined,
+                    monitorId: monitor.id!,
                     isHeadRequest: MonitorUtil.isHeadRequest(monitorStep),
                     requestType:
                         monitorStep.data?.requestType || HTTPMethod.GET,
+                    retry: 5,
                 }
             );
+
+            if (!response) {
+                return null;
+            }
 
             result.isOnline = response.isOnline;
             result.responseTimeInMs = response.responseTimeInMS?.toNumber();
             result.responseBody = response.responseBody;
             result.responseHeaders = response.responseHeaders;
             result.responseCode = response.statusCode;
+            result.failureCause = response.failureCause;
         }
 
         return result;

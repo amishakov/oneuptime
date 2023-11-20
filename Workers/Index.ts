@@ -25,6 +25,7 @@ import './Jobs/HardDelete/HardDeleteItemsInDatabase';
 
 // Scheduled Event
 import './Jobs/ScheduledMaintenance/ChangeStateToOngoing';
+import './Jobs/ScheduledMaintenance/ChangeStateToEnded';
 import './Jobs/ScheduledMaintenance/SendEmailToSubscribers';
 import './Jobs/ScheduledMaintenanceStateTimeline/SendEmailToSubscribers';
 
@@ -70,6 +71,10 @@ import './Jobs/UserOnCallLog/ExecutePendingExecutions';
 import './Jobs/UserOnCallLog/TimeoutStuckExecutions';
 
 import './Jobs/IncomingRequestMonitor/CheckHeartbeat';
+import { ClickhouseAppInstance } from 'CommonServer/Infrastructure/ClickhouseDatabase';
+// import AnalyticsTableManagement from './Utils/AnalyticsDatabase/TableManegement';
+
+import './Jobs/Workflow/TimeoutJobs';
 
 const APP_NAME: string = 'workers';
 
@@ -78,7 +83,7 @@ const app: ExpressApplication = Express.getExpressApp();
 //cert routes.
 app.use(`/${APP_NAME.toLocaleLowerCase()}`, StatusPageCerts);
 
-const init: Function = async (): Promise<void> => {
+const init: () => Promise<void> = async (): Promise<void> => {
     try {
         // init the app
         await App(APP_NAME);
@@ -90,7 +95,14 @@ const init: Function = async (): Promise<void> => {
         // connect redis
         await Redis.connect();
 
+        await ClickhouseAppInstance.connect(
+            ClickhouseAppInstance.getDatasourceOptions()
+        );
+
         await RunDatabaseMigrations();
+
+        // create tables in analytics database
+        // await AnalyticsTableManagement.createTables();
 
         // Job process.
         QueueWorker.getWorker(
@@ -111,7 +123,12 @@ const init: Function = async (): Promise<void> => {
     } catch (err) {
         logger.error('App Init Failed:');
         logger.error(err);
+        throw err;
     }
 };
 
-init();
+init().catch((err: Error) => {
+    logger.error(err);
+    logger.info('Exiting node process');
+    process.exit(1);
+});

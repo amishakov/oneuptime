@@ -25,6 +25,11 @@ export interface TimelineItem {
     iconColor: Color;
 }
 
+export interface EventItemLabel {
+    name: string;
+    color: Color;
+}
+
 export interface ComponentProps {
     eventTitle: string;
     eventResourcesAffected?: Array<string> | undefined;
@@ -40,6 +45,7 @@ export interface ComponentProps {
     anotherStatus?: string | undefined;
     anotherStatusColor?: Color | undefined;
     eventSecondDescription: string;
+    labels?: Array<EventItemLabel> | undefined;
 }
 
 const EventItem: FunctionComponent<ComponentProps> = (
@@ -105,6 +111,25 @@ const EventItem: FunctionComponent<ComponentProps> = (
                         {props.eventMiniDescription}
                     </p>
                 )}
+
+                {props.labels && props.labels.length > 0 ? (
+                    <div className="flex space-x-1 mt-3">
+                        {props.labels.map(
+                            (label: EventItemLabel, i: number) => {
+                                return (
+                                    <div key={i}>
+                                        <Pill
+                                            text={label.name}
+                                            color={label.color}
+                                        />
+                                    </div>
+                                );
+                            }
+                        )}
+                    </div>
+                ) : (
+                    <></>
+                )}
             </div>
             <div>
                 {props.eventResourcesAffected &&
@@ -118,7 +143,7 @@ const EventItem: FunctionComponent<ComponentProps> = (
                 {props.eventResourcesAffected &&
                 props.eventResourcesAffected?.length > 0 ? (
                     <div key={0}>
-                        <div className="flex space-x-1">
+                        <div className="flex flex-wrap gap-y-4 space-x-1">
                             <div className="text-sm text-gray-400 mr-3 mt-1">
                                 Affected resources
                             </div>

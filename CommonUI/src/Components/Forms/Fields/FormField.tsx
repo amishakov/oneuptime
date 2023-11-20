@@ -1,14 +1,11 @@
-import React, { ReactElement, useEffect } from 'react';
+import React, { ReactElement } from 'react';
 
 import BadDataException from 'Common/Types/Exception/BadDataException';
 import FormFieldSchemaType from '../Types/FormFieldSchemaType';
 import ColorPicker from '../Fields/ColorPicker';
 import Color from 'Common/Types/Color';
 import TextArea from '../../TextArea/TextArea';
-import Dropdown, {
-    DropdownOption,
-    DropdownValue,
-} from '../../Dropdown/Dropdown';
+import Dropdown, { DropdownValue } from '../../Dropdown/Dropdown';
 import Toggle from '../../Toggle/Toggle';
 import Input, { InputType } from '../../Input/Input';
 import CodeEditor from '../../CodeEditor/CodeEditor';
@@ -21,7 +18,8 @@ import Field, { FormFieldStyleType } from '../Types/Field';
 import FieldLabelElement from '../Fields/FieldLabel';
 import FormValues from '../Types/FormValues';
 import { JSONValue } from 'Common/Types/JSON';
-import ComponentLoader from '../../ComponentLoader/ComponentLoader';
+import IDGenerator from '../../ObjectID/IDGenerator';
+import ObjectID from 'Common/Types/ObjectID';
 
 export interface ComponentProps<T extends Object> {
     field: Field<T>;
@@ -34,35 +32,14 @@ export interface ComponentProps<T extends Object> {
     setFieldTouched: (fieldName: string, value: boolean) => void;
     setFieldValue: (fieldName: string, value: JSONValue) => void;
     disableAutofocus?: boolean;
-    submitForm: () => void | undefined;
+    submitForm?: (() => void) | undefined;
 }
 
-const FormField: Function = <T extends Object>(
+const FormField: <T extends Object>(
+    props: ComponentProps<T>
+) => ReactElement = <T extends Object>(
     props: ComponentProps<T>
 ): ReactElement => {
-    const [dropdownOptions, setDropdownOptions] = React.useState<
-        Array<DropdownOption>
-    >(props.field.dropdownOptions || []);
-    const [isFieldLoading, setIsFieldLoading] = React.useState<boolean>(false);
-
-    const fetchDropdownOptions: Function = async (): Promise<void> => {
-        if (!props.field.fetchDropdownOptions) {
-            return;
-        }
-
-        setIsFieldLoading(true);
-
-        const options: Array<DropdownOption> =
-            await props.field.fetchDropdownOptions();
-
-        setDropdownOptions(options);
-        setIsFieldLoading(false);
-    };
-
-    useEffect(() => {
-        fetchDropdownOptions().catch();
-    }, [props.field]);
-
     const getFieldType: Function = (fieldType: FormFieldSchemaType): string => {
         switch (fieldType) {
             case FormFieldSchemaType.Email:
@@ -95,7 +72,7 @@ const FormField: Function = <T extends Object>(
             ? getFieldType(props.field.fieldType)
             : 'text';
 
-        if (Object.keys(props.field.field).length === 0) {
+        if (Object.keys(props.field.field || {}).length === 0) {
             throw new BadDataException('Object cannot be without Field');
         }
 
@@ -179,7 +156,7 @@ const FormField: Function = <T extends Object>(
                                 props.field.fieldType ===
                                 FormFieldSchemaType.MultiSelectDropdown
                             }
-                            options={dropdownOptions}
+                            options={props.field.dropdownOptions || []}
                             placeholder={props.field.placeholder || ''}
                             initialValue={
                                 props.currentValues &&
@@ -188,6 +165,35 @@ const FormField: Function = <T extends Object>(
                                           props.fieldName
                                       ]
                                     : ''
+                            }
+                        />
+                    )}
+
+                    {props.field.fieldType === FormFieldSchemaType.ObjectID && (
+                        <IDGenerator
+                            tabIndex={index}
+                            disabled={props.isDisabled || props.field.disabled}
+                            error={
+                                props.touched && props.error
+                                    ? props.error
+                                    : undefined
+                            }
+                            dataTestId={fieldType}
+                            onChange={(value: ObjectID) => {
+                                props.field.onChange &&
+                                    props.field.onChange(value);
+                                props.setFieldValue(props.fieldName, value);
+                            }}
+                            onEnterPress={() => {
+                                props.submitForm && props.submitForm();
+                            }}
+                            initialValue={
+                                props.currentValues &&
+                                (props.currentValues as any)[props.fieldName]
+                                    ? (props.currentValues as any)[
+                                          props.fieldName
+                                      ]
+                                    : props.field.defaultValue || null
                             }
                         />
                     )}
@@ -510,7 +516,7 @@ const FormField: Function = <T extends Object>(
                                 props.setFieldValue(props.fieldName, value);
                             }}
                             onEnterPress={() => {
-                                props.submitForm();
+                                props.submitForm && props.submitForm();
                             }}
                             onBlur={() => {
                                 props.setFieldTouched(props.fieldName, true);
@@ -530,10 +536,6 @@ const FormField: Function = <T extends Object>(
             </div>
         );
     };
-
-    if (isFieldLoading) {
-        return <ComponentLoader />;
-    }
 
     return <>{getFormField()}</>;
 };

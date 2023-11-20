@@ -1,12 +1,7 @@
 import UserEmail from 'Model/Models/UserEmail';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
 import IconProp from 'Common/Types/Icon/IconProp';
-import React, {
-    FunctionComponent,
-    ReactElement,
-    useEffect,
-    useState,
-} from 'react';
+import React, { ReactElement, useEffect, useState } from 'react';
 import DashboardNavigation from '../../Utils/Navigation';
 import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import User from 'CommonUI/src/Utils/User';
@@ -21,7 +16,7 @@ import { DASHBOARD_API_URL } from 'CommonUI/src/Config';
 import API from 'CommonUI/src/Utils/API/API';
 import ConfirmModal from 'CommonUI/src/Components/Modal/ConfirmModal';
 
-const Email: FunctionComponent = (): ReactElement => {
+const Email: () => JSX.Element = (): ReactElement => {
     const [showVerificationCodeModal, setShowVerificationCodeModal] =
         useState<boolean>(false);
 
@@ -51,10 +46,10 @@ const Email: FunctionComponent = (): ReactElement => {
                     userId: User.getUserId().toString(),
                 }}
                 refreshToggle={refreshToggle}
-                onBeforeCreate={(model: UserEmail): UserEmail => {
+                onBeforeCreate={(model: UserEmail): Promise<UserEmail> => {
                     model.projectId = DashboardNavigation.getProjectId()!;
                     model.userId = User.getUserId();
-                    return model;
+                    return Promise.resolve(model);
                 }}
                 createVerb={'Add'}
                 actionButtons={[
@@ -118,7 +113,6 @@ const Email: FunctionComponent = (): ReactElement => {
                 isEditable={false}
                 isCreateable={true}
                 cardProps={{
-                    icon: IconProp.Email,
                     title: 'Emails for Notifications',
                     description:
                         'Manage emails that will receive notifications for this project.',
@@ -168,7 +162,6 @@ const Email: FunctionComponent = (): ReactElement => {
                         setShowVerificationCodeModal(false);
                     }}
                     isLoading={isLoading}
-                    name="Verify Email"
                     submitButtonText={'Verify'}
                     onSubmit={async (item: JSONObject) => {
                         setIsLoading(true);
@@ -201,6 +194,7 @@ const Email: FunctionComponent = (): ReactElement => {
                         }
                     }}
                     formProps={{
+                        name: 'Verify Email',
                         error: error || '',
                         fields: [
                             {

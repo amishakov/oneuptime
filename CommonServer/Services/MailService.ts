@@ -4,7 +4,7 @@ import Route from 'Common/Types/API/Route';
 import URL from 'Common/Types/API/URL';
 import { JSONObject } from 'Common/Types/JSON';
 import API from 'Common/Utils/API';
-import { NotificationHostname } from '../Config';
+import { NotificationHostname } from '../EnvironmentConfig';
 import Email from 'Common/Types/Email/EmailMessage';
 import EmailServer from 'Common/Types/Email/EmailServer';
 import Protocol from 'Common/Types/API/Protocol';
@@ -28,13 +28,13 @@ export class MailService extends BaseService {
 
         if (options && options.mailServer) {
             body['SMTP_ID'] = options.mailServer.id?.toString();
-            body['SMTP_USERNAME'] = options.mailServer.username;
+            body['SMTP_USERNAME'] = options.mailServer.username || undefined;
             body['SMTP_EMAIL'] = options.mailServer.fromEmail.toString();
             body['SMTP_FROM_NAME'] = options.mailServer.fromName;
             body['SMTP_IS_SECURE'] = options.mailServer.secure;
             body['SMTP_PORT'] = options.mailServer.port.toNumber();
             body['SMTP_HOST'] = options.mailServer.host.toString();
-            body['SMTP_PASSWORD'] = options.mailServer.password;
+            body['SMTP_PASSWORD'] = options.mailServer.password || undefined;
         }
 
         if (options?.userOnCallLogTimelineId) {

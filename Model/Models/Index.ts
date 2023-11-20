@@ -113,6 +113,25 @@ import DataMigration from './DataMigration';
 import ShortLink from './ShortLink';
 import EmailLog from './EmailLog';
 
+import IncidentTemplate from './IncidentTemplate';
+import IncidentTemplateOwnerTeam from './IncidentTemplateOwnerTeam';
+import IncidentTemplateOwnerUser from './IncidentTemplateOwnerUser';
+
+import IncidentNoteTemplate from './IncidentNoteTemplate';
+import ScheduledMaintenanceNoteTemplate from './ScheduledMaintenanceNoteTemplate';
+
+import ResellerPlan from './ResellerPlan';
+import Reseller from './Reseller';
+import PromoCode from './PromoCode';
+import GlobalConfig from './GlobalConfig';
+
+// Monitor Groups
+import MonitorGroup from './MonitorGroup';
+import MonitorGroupOwnerTeam from './MonitorGroupOwnerTeam';
+import MonitorGroupOwnerUser from './MonitorGroupOwnerUser';
+import MonitorGroupResource from './MonitorGroupResource';
+import Service from './Service';
+
 export default [
     User,
     Probe,
@@ -209,4 +228,26 @@ export default [
     DataMigration,
 
     ShortLink,
+
+    IncidentTemplate,
+    IncidentTemplateOwnerTeam,
+    IncidentTemplateOwnerUser,
+
+    IncidentNoteTemplate,
+
+    ScheduledMaintenanceNoteTemplate,
+
+    Reseller,
+    ResellerPlan,
+
+    PromoCode,
+
+    GlobalConfig,
+
+    MonitorGroup,
+    MonitorGroupOwnerTeam,
+    MonitorGroupOwnerUser,
+    MonitorGroupResource,
+
+    Service,
 ];

@@ -40,6 +40,7 @@ import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
     read: [
         Permission.ProjectOwner,
         Permission.ProjectAdmin,
+        Permission.ProjectMember,
         Permission.CanReadProjectSMTPConfig,
     ],
     delete: [
@@ -75,6 +76,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [],
@@ -110,6 +112,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [],
@@ -139,6 +142,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [
@@ -165,6 +169,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [],
@@ -192,6 +197,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [
@@ -222,6 +228,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [],
@@ -257,6 +264,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [],
@@ -279,6 +287,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [],
@@ -310,6 +319,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [],
@@ -327,6 +337,8 @@ export default class ProjectSmtpConfig extends BaseModel {
     })
     public deletedByUserId?: ObjectID = undefined;
 
+    // This is not required because some SMTP servers do not require authentication.
+    // eg: https://learn.microsoft.com/en-us/exchange/mail-flow-best-practices/how-to-set-up-a-multifunction-device-or-application-to-send-email-using-microsoft-365-or-office-365#option-2-send-mail-directly-from-your-printer-or-application-to-microsoft-365-or-office-365-direct-send
     @ColumnAccessControl({
         create: [
             Permission.ProjectOwner,
@@ -336,6 +348,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [
@@ -344,9 +357,9 @@ export default class ProjectSmtpConfig extends BaseModel {
             Permission.CanEditProjectSMTPConfig,
         ],
     })
-    @TableColumn({ required: true, type: TableColumnType.ShortText })
+    @TableColumn({ required: false, type: TableColumnType.ShortText })
     @Column({
-        nullable: false,
+        nullable: true,
         type: ColumnType.ShortText,
         length: ColumnLength.ShortText,
     })
@@ -369,9 +382,9 @@ export default class ProjectSmtpConfig extends BaseModel {
             Permission.CanEditProjectSMTPConfig,
         ],
     })
-    @TableColumn({ required: true, type: TableColumnType.Password })
+    @TableColumn({ required: false, type: TableColumnType.Password })
     @Column({
-        nullable: false,
+        nullable: true,
         type: ColumnType.Password,
         length: ColumnLength.Password,
     })
@@ -386,6 +399,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [
@@ -412,6 +426,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [
@@ -437,6 +452,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [
@@ -463,6 +479,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [
@@ -488,6 +505,7 @@ export default class ProjectSmtpConfig extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectSMTPConfig,
         ],
         update: [

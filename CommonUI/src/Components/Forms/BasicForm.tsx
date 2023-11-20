@@ -27,6 +27,9 @@ import { FormStep } from './Types/FormStep';
 import Steps from './Steps/Steps';
 import FormField from './Fields/FormField';
 import Validation from './Validation';
+import useAsyncEffect from 'use-async-effect';
+import API from '../../Utils/API/API';
+import ErrorMessage from '../ErrorMessage/ErrorMessage';
 
 export const DefaultValidateFunction: Function = (
     _values: FormValues<JSONObject>
@@ -34,12 +37,9 @@ export const DefaultValidateFunction: Function = (
     return {};
 };
 
-export interface ComponentProps<T extends Object> {
-    id: string;
-    name: string;
+export interface BaseComponentProps<T extends Object> {
     submitButtonStyleType?: ButtonStyleType | undefined;
-    initialValues: FormValues<T>;
-    onSubmit: (values: FormValues<T>) => void;
+    initialValues?: FormValues<T> | undefined;
     onValidate?: undefined | ((values: FormValues<T>) => JSONObject);
     onChange?: undefined | ((values: FormValues<T>) => void);
     fields: Fields<T>;
@@ -48,17 +48,24 @@ export interface ComponentProps<T extends Object> {
     title?: undefined | string;
     description?: undefined | string;
     showAsColumns?: undefined | number;
-    footer: ReactElement;
     isLoading?: undefined | boolean;
+    id?: string | undefined;
+    name?: string | undefined;
     onCancel?: undefined | (() => void) | null;
     cancelButtonText?: undefined | string | null;
     maxPrimaryButtonWidth?: undefined | boolean;
-    error: string | null;
     disableAutofocus?: undefined | boolean;
     hideSubmitButton?: undefined | boolean;
+    error?: string | undefined;
     onFormStepChange?: undefined | ((stepId: string) => void);
     onIsLastFormStep?: undefined | ((isLastFormStep: boolean) => void);
     onFormValidationErrorChanged?: ((hasError: boolean) => void) | undefined;
+}
+
+export interface ComponentProps<T extends Object>
+    extends BaseComponentProps<T> {
+    onSubmit: (values: FormValues<T>) => void;
+    footer: ReactElement;
 }
 
 const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
@@ -68,14 +75,31 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
     ): ReactElement => {
         const isSubmitting: MutableRefObject<boolean> = useRef(false);
 
+        const [isLoading, setIsLoading] = useState<boolean | undefined>(
+            props.isLoading
+        );
+
+        const [formError, setFormError] = useState<string | null>(null);
+
+        const [isDropdownOptionsLoading, setIsDropdownOptionsLoading] =
+            useState<boolean>(false);
+
+        useEffect(() => {
+            setIsLoading(props.isLoading);
+        }, [props.isLoading]);
+
         const [submitButtonText, setSubmitButtonText] = useState<string>(
             props.submitButtonText || 'Submit'
         );
 
+        const [formSteps, setFormSteps] = useState<
+            Array<FormStep<T>> | undefined
+        >(props.steps);
+
         const isInitialValuesSet: MutableRefObject<boolean> = useRef(false);
 
-        const refCurrentValue: MutableRefObject<FormValues<T>> = useRef(
-            props.initialValues
+        const refCurrentValue: React.MutableRefObject<FormValues<T>> = useRef(
+            props.initialValues || {}
         );
 
         const [currentFormStepId, setCurrentFormStepId] = useState<
@@ -83,8 +107,8 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
         >(null);
 
         useEffect(() => {
-            if (props.steps && props.steps.length > 0 && props.steps[0]) {
-                setCurrentFormStepId(props.steps[0].id);
+            if (formSteps && formSteps.length > 0 && formSteps[0]) {
+                setCurrentFormStepId(formSteps[0].id);
             }
         }, []);
 
@@ -92,11 +116,11 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
             // if last step,
 
             if (
-                props.steps &&
-                props.steps.length > 0 &&
+                formSteps &&
+                formSteps.length > 0 &&
                 (
-                    (props.steps as Array<FormStep<T>>)[
-                        props.steps.length - 1
+                    (formSteps as Array<FormStep<T>>)[
+                        formSteps.length - 1
                     ] as FormStep<T>
                 ).id === currentFormStepId
             ) {
@@ -121,25 +145,37 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
                     props.onIsLastFormStep(true);
                 }
             }
-        }, [currentFormStepId]);
+        }, [currentFormStepId, formSteps]);
 
         const [currentValue, setCurrentValue] = useState<FormValues<T>>(
-            props.initialValues
+            props.initialValues || {}
         );
 
         const [errors, setErrors] = useState<Dictionary<string>>({});
         const [touched, setTouched] = useState<Dictionary<boolean>>({});
 
+        useEffect(() => {
+            setFormSteps(
+                props.steps?.filter((step: FormStep<T>) => {
+                    if (!step.showIf) {
+                        return true;
+                    }
+
+                    return step.showIf(refCurrentValue.current);
+                })
+            );
+        }, [refCurrentValue.current]);
+
         const [formFields, setFormFields] = useState<Fields<T>>([]);
 
-        const setFieldTouched: Function = (
+        const setFieldTouched: (fieldName: string, value: boolean) => void = (
             fieldName: string,
             value: boolean
         ): void => {
             setTouched({ ...touched, [fieldName]: value });
         };
 
-        const validate: Function = (
+        const validate: (values: FormValues<T>) => Dictionary<string> = (
             values: FormValues<T>
         ): Dictionary<string> => {
             const totalValidationErrors: Dictionary<string> =
@@ -177,21 +213,39 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
             [currentValue, errors, touched, formFields]
         );
 
-        useEffect(() => {
-            setFormFields([
+        useAsyncEffect(async () => {
+            const fields: Fields<T> = [
                 ...props.fields.map((field: Field<T>) => {
                     return {
                         name: getFieldName(field),
                         ...field,
                     };
                 }),
-            ]);
+            ];
+
+            for (const item of fields) {
+                if (item.fetchDropdownOptions) {
+                    setIsDropdownOptionsLoading(true);
+                    // If a dropdown has fetch optiosn then we need to fetch them
+                    try {
+                        const options: Array<DropdownOption> =
+                            await item.fetchDropdownOptions();
+                        item.dropdownOptions = options;
+                    } catch (err) {
+                        setFormError(API.getFriendlyMessage(err));
+                    }
+                }
+            }
+
+            setIsDropdownOptionsLoading(false);
+
+            setFormFields(fields);
         }, [props.fields]);
 
         const getFieldName: Function = (field: Field<T>): string => {
             const fieldName: string = field.overrideFieldKey
                 ? field.overrideFieldKey
-                : (Object.keys(field.field)[0] as string);
+                : (Object.keys(field.field || {})[0] as string);
 
             return fieldName;
         };
@@ -214,7 +268,7 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
             setTouched({ ...touched, ...touchedObj });
         };
 
-        const setFieldValue: Function = (
+        const setFieldValue: (fieldName: string, value: JSONValue) => void = (
             fieldName: string,
             value: JSONValue
         ): void => {
@@ -232,7 +286,7 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
             }
         };
 
-        const submitForm: Function = (): void => {
+        const submitForm: () => void = (): void => {
             // check for any boolean values and if they don't exist in values - mark them as false.
 
             setAllTouched();
@@ -251,11 +305,11 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
             // if last step then submit.
 
             if (
-                (props.steps &&
-                    props.steps.length > 0 &&
+                (formSteps &&
+                    formSteps.length > 0 &&
                     (
-                        (props.steps as Array<FormStep<T>>)[
-                            props.steps.length - 1
+                        (formSteps as Array<FormStep<T>>)[
+                            formSteps.length - 1
                         ] as FormStep<T>
                     ).id === currentFormStepId) ||
                 currentFormStepId === null
@@ -267,6 +321,38 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
                         const fieldName: string = field.name!;
                         if (!(values as any)[fieldName]) {
                             (values as any)[fieldName] = false;
+                        }
+                    }
+
+                    if (field.fieldType === FormFieldSchemaType.Email) {
+                        const fieldName: string = field.name!;
+                        if ((values as any)[fieldName]) {
+                            (values as any)[fieldName] = (
+                                (values as any)[fieldName] as string
+                            )
+                                .toString()
+                                .toLowerCase();
+                        }
+                    }
+
+                    if (
+                        field.fieldType ===
+                        FormFieldSchemaType.MultiSelectDropdown
+                    ) {
+                        const fieldName: string = field.name!;
+
+                        if (
+                            (values as any)[fieldName] &&
+                            (values as any)[fieldName].length > 0 &&
+                            (values as any)[fieldName][0]['value']
+                        ) {
+                            (values as any)[fieldName] = (
+                                (values as any)[
+                                    fieldName
+                                ] as Array<DropdownOption>
+                            ).map((item: DropdownOption) => {
+                                return item.value;
+                            });
                         }
                     }
 
@@ -299,16 +385,8 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
                 UiAnalytics.capture('FORM SUBMIT: ' + props.name);
 
                 props.onSubmit(values);
-            } else if (props.steps && props.steps.length > 0) {
-                const steps: Array<FormStep<T>> = props.steps.filter(
-                    (step: FormStep<T>) => {
-                        if (!step.showIf) {
-                            return true;
-                        }
-
-                        return step.showIf(refCurrentValue.current);
-                    }
-                );
+            } else if (formSteps && formSteps.length > 0) {
+                const steps: Array<FormStep<T>> = formSteps;
 
                 const currentStepIndex: number = steps.findIndex(
                     (step: FormStep<T>) => {
@@ -333,7 +411,9 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
                 return;
             }
 
-            const values: FormValues<T> = { ...props.initialValues };
+            const values: FormValues<T> = {
+                ...props.initialValues,
+            } as FormValues<T>;
             for (const field of formFields) {
                 const fieldName: string = field.name!;
 
@@ -394,6 +474,10 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
             primaryButtonStyle.width = '100%';
         }
 
+        if (formError) {
+            return <ErrorMessage error={formError} />;
+        }
+
         return (
             <div className="row">
                 <div className="col-lg-1">
@@ -411,13 +495,13 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
                         )}
 
                         <div className="flex">
-                            {props.steps && currentFormStepId && (
+                            {formSteps && currentFormStepId && (
                                 <div className="w-1/3">
                                     {/* Form Steps */}
 
                                     <Steps
                                         currentFormStepId={currentFormStepId}
-                                        steps={props.steps}
+                                        steps={formSteps}
                                         formValues={refCurrentValue.current}
                                         onClick={(step: FormStep<T>) => {
                                             setCurrentFormStepId(step.id);
@@ -427,7 +511,7 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
                             )}
                             <div
                                 className={`${
-                                    props.steps && currentFormStepId
+                                    formSteps && currentFormStepId
                                         ? 'w-2/3 pt-6'
                                         : 'w-full pt-1'
                                 }`}
@@ -471,7 +555,7 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
                                                                 )}
                                                             >
                                                                 {
-                                                                    <FormField
+                                                                    <FormField<T>
                                                                         field={
                                                                             field
                                                                         }
@@ -498,7 +582,8 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
                                                                             false
                                                                         }
                                                                         isDisabled={
-                                                                            props.isLoading ||
+                                                                            isLoading ||
+                                                                            isDropdownOptionsLoading ||
                                                                             false
                                                                         }
                                                                         currentValues={
@@ -510,7 +595,7 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
                                                                         setFieldTouched={
                                                                             setFieldTouched
                                                                         }
-                                                                        submitform={
+                                                                        submitForm={
                                                                             submitForm
                                                                         }
                                                                         disableAutofocus={
@@ -549,7 +634,9 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
                                                 }}
                                                 id={`${props.id}-submit-button`}
                                                 isLoading={
-                                                    props.isLoading || false
+                                                    isLoading ||
+                                                    isDropdownOptionsLoading ||
+                                                    false
                                                 }
                                                 buttonStyle={
                                                     props.submitButtonStyleType ||
@@ -569,7 +656,9 @@ const BasicForm: ForwardRefExoticComponent<any> = forwardRef(
                                                 type={ButtonTypes.Button}
                                                 id={`${props.id}-cancel-button`}
                                                 disabled={
-                                                    props.isLoading || false
+                                                    isLoading ||
+                                                    isDropdownOptionsLoading ||
+                                                    false
                                                 }
                                                 buttonStyle={
                                                     ButtonStyleType.NORMAL

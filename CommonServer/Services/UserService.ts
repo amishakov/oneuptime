@@ -1,14 +1,16 @@
 import PostgresDatabase from '../Infrastructure/PostgresDatabase';
 import Model from 'Model/Models/User';
-import DatabaseService, { OnUpdate } from './DatabaseService';
-import DatabaseCommonInteractionProps from 'Common/Types/Database/DatabaseCommonInteractionProps';
+import DatabaseService from './DatabaseService';
+import { OnUpdate } from '../Types/Database/Hooks';
+import DatabaseCommonInteractionProps from 'Common/Types/BaseDatabase/DatabaseCommonInteractionProps';
 import Email from 'Common/Types/Email';
 import ObjectID from 'Common/Types/ObjectID';
 import MailService from './MailService';
 import UpdateBy from '../Types/Database/UpdateBy';
 import LIMIT_MAX from 'Common/Types/Database/LimitMax';
 import EmailTemplateType from 'Common/Types/Email/EmailTemplateType';
-import { AccountsRoute, Domain, HttpProtocol } from '../Config';
+import { AccountsRoute } from 'Common/ServiceRoute';
+import DatabaseConfig from '../DatabaseConfig';
 import logger from '../Utils/Logger';
 import URL from 'Common/Types/API/URL';
 import EmailVerificationToken from 'Model/Models/EmailVerificationToken';
@@ -19,6 +21,8 @@ import TeamMember from 'Model/Models/TeamMember';
 import TeamMemberService from './TeamMemberService';
 import UserNotificationRuleService from './UserNotificationRuleService';
 import UserNotificationSettingService from './UserNotificationSettingService';
+import Hostname from 'Common/Types/API/Hostname';
+import Protocol from 'Common/Types/API/Protocol';
 
 export class Service extends DatabaseService<Model> {
     public constructor(postgresDatabase?: PostgresDatabase) {
@@ -67,6 +71,10 @@ export class Service extends DatabaseService<Model> {
         _updatedItemIds: ObjectID[]
     ): Promise<OnUpdate<Model>> {
         if (onUpdate && onUpdate.updateBy.data.password) {
+            const host: Hostname = await DatabaseConfig.getHost();
+            const httpProtocol: Protocol =
+                await DatabaseConfig.getHttpProtocol();
+
             for (const user of onUpdate.carryForward) {
                 // password changed, send password changed mail
                 MailService.sendMail({
@@ -74,7 +82,7 @@ export class Service extends DatabaseService<Model> {
                     subject: 'Password Changed.',
                     templateType: EmailTemplateType.PasswordChanged,
                     vars: {
-                        homeURL: new URL(HttpProtocol, Domain).toString(),
+                        homeURL: new URL(httpProtocol, host).toString(),
                     },
                 }).catch((err: Error) => {
                     logger.error(err);
@@ -161,8 +169,8 @@ export class Service extends DatabaseService<Model> {
 
                     const emailVerificationToken: EmailVerificationToken =
                         new EmailVerificationToken();
-                    emailVerificationToken.userId = user?.id!;
-                    emailVerificationToken.email = newUser?.email!;
+                    emailVerificationToken.userId = user.id;
+                    emailVerificationToken.email = newUser.email!;
                     emailVerificationToken.token = generatedToken;
                     emailVerificationToken.expires =
                         OneUptimeDate.getOneDayAfter();
@@ -174,6 +182,10 @@ export class Service extends DatabaseService<Model> {
                         },
                     });
 
+                    const host: Hostname = await DatabaseConfig.getHost();
+                    const httpProtocol: Protocol =
+                        await DatabaseConfig.getHttpProtocol();
+
                     MailService.sendMail({
                         toEmail: newUser.email!,
                         subject:
@@ -182,13 +194,13 @@ export class Service extends DatabaseService<Model> {
                         vars: {
                             name: newUser.name!.toString(),
                             tokenVerifyUrl: new URL(
-                                HttpProtocol,
-                                Domain,
+                                httpProtocol,
+                                host,
                                 new Route(AccountsRoute.toString()).addRoute(
                                     '/verify-email/' + generatedToken.toString()
                                 )
                             ).toString(),
-                            homeUrl: new URL(HttpProtocol, Domain).toString(),
+                            homeUrl: new URL(httpProtocol, host).toString(),
                         },
                     }).catch((err: Error) => {
                         logger.error(err);

@@ -68,9 +68,6 @@ class BaseAPI extends API {
         let defaultHeaders: Headers = this.getDefaultHeaders();
 
         const headers: Headers = {};
-        if (User.isLoggedIn()) {
-            headers['Authorization'] = 'Basic ' + User.getAccessToken();
-        }
 
         const globalPermissionsHash: string = LocalStorage.getItem(
             'global-permissions-hash'
@@ -98,15 +95,35 @@ class BaseAPI extends API {
     protected static override handleError(
         error: HTTPErrorResponse | APIException
     ): HTTPErrorResponse | APIException {
-        if (error instanceof HTTPErrorResponse && error.statusCode === 401) {
+        // 405 Status - Tenant not found. If Project was deleted.
+        // 401 Status - User is not logged in.
+        if (
+            error instanceof HTTPErrorResponse &&
+            (error.statusCode === 401 || error.statusCode === 405)
+        ) {
+            const loginRoute: Route = this.getLoginRoute();
+
             const cookies: Cookies = new Cookies();
             cookies.remove('admin-data', { path: '/' });
             cookies.remove('data', { path: '/' });
             User.clear();
-            Navigation.navigate(new Route('/accounts/login'));
+
+            if (Navigation.getQueryStringByName('token')) {
+                Navigation.navigate(loginRoute.addRouteParam('sso', 'true'), {
+                    forceNavigate: true,
+                });
+            } else {
+                Navigation.navigate(loginRoute, {
+                    forceNavigate: true,
+                });
+            }
         }
 
         return error;
+    }
+
+    protected static getLoginRoute(): Route {
+        return new Route('/accounts/login');
     }
 
     public static getFriendlyMessage(

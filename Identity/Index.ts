@@ -5,15 +5,19 @@ import logger from 'CommonServer/Utils/Logger';
 import App from 'CommonServer/Utils/StartServer';
 import AuthenticationAPI from './API/Authentication';
 import SsoAPI from './API/SSO';
+import ResellerAPI from './API/Reseller';
 import StatusPageSsoAPI from './API/StatusPageSSO';
 import StatusPageAuthenticationAPI from './API/StatusPageAuthentication';
 import Redis from 'CommonServer/Infrastructure/Redis';
+import { ClickhouseAppInstance } from 'CommonServer/Infrastructure/ClickhouseDatabase';
 
 const app: ExpressApplication = Express.getExpressApp();
 
 const APP_NAME: string = 'identity';
 
 app.use([`/${APP_NAME}`, '/'], AuthenticationAPI);
+
+app.use([`/${APP_NAME}`, '/'], ResellerAPI);
 
 app.use([`/${APP_NAME}`, '/'], SsoAPI);
 
@@ -24,7 +28,7 @@ app.use(
     StatusPageAuthenticationAPI
 );
 
-const init: Function = async (): Promise<void> => {
+const init: () => Promise<void> = async (): Promise<void> => {
     try {
         // init the app
         await App(APP_NAME);
@@ -35,10 +39,19 @@ const init: Function = async (): Promise<void> => {
 
         // connect redis
         await Redis.connect();
+
+        await ClickhouseAppInstance.connect(
+            ClickhouseAppInstance.getDatasourceOptions()
+        );
     } catch (err) {
         logger.error('App Init Failed:');
         logger.error(err);
+        throw err;
     }
 };
 
-init();
+init().catch((err: Error) => {
+    logger.error(err);
+    logger.info('Exiting node process');
+    process.exit(1);
+});

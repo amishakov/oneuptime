@@ -32,6 +32,7 @@ const ProjectPicker: FunctionComponent<ComponentProps> = (
 
     useEffect(() => {
         setDropdownVisible(isComponentVisible);
+        setFilterValue('');
     }, [isComponentVisible]);
 
     return (
@@ -68,7 +69,7 @@ const ProjectPicker: FunctionComponent<ComponentProps> = (
                     {isComponentVisible && (
                         <ProjectPickerMenu
                             onFilter={(value: string) => {
-                                setFilterValue(value.trim());
+                                setFilterValue(value.toLowerCase().trim());
                             }}
                         >
                             <>
@@ -82,7 +83,7 @@ const ProjectPicker: FunctionComponent<ComponentProps> = (
                                                 project.name &&
                                                 project.name
                                                     .toLowerCase()
-                                                    .includes(filterValue)
+                                                    .startsWith(filterValue)
                                             );
                                         })
                                         .map((project: Project, i: number) => {

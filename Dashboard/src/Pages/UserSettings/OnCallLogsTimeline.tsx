@@ -8,7 +8,6 @@ import DashboardSideMenu from './SideMenu';
 import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import DashboardNavigation from '../../Utils/Navigation';
 import User from 'CommonUI/src/Utils/User';
-import IconProp from 'Common/Types/Icon/IconProp';
 import Navigation from 'CommonUI/src/Utils/Navigation';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import { JSONObject } from 'Common/Types/JSON';
@@ -19,7 +18,6 @@ import { ButtonStyleType } from 'CommonUI/src/Components/Button/Button';
 import ConfirmModal from 'CommonUI/src/Components/Modal/ConfirmModal';
 import ObjectID from 'Common/Types/ObjectID';
 import UserOnCallLogTimeline from 'Model/Models/UserOnCallLogTimeline';
-import BaseModel from 'Common/Models/BaseModel';
 import NotificationMethodView from '../../Components/NotificationMethods/NotificationMethod';
 import DropdownUtil from 'CommonUI/src/Utils/Dropdown';
 
@@ -47,7 +45,6 @@ const Settings: FunctionComponent<PageComponentProps> = (
                 isEditable={false}
                 isCreateable={false}
                 cardProps={{
-                    icon: IconProp.Logs,
                     title: 'Notification Timeline',
                     description:
                         'Here are all the timeline events. This will help you to debug any notification issues that you may face.',
@@ -97,7 +94,7 @@ const Settings: FunctionComponent<PageComponentProps> = (
                         },
                         title: 'Notification Method',
                         type: FieldType.Element,
-                        getElement: (item: BaseModel): ReactElement => {
+                        getElement: (item: JSONObject): ReactElement => {
                             return (
                                 <NotificationMethodView
                                     item={item}

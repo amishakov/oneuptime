@@ -13,7 +13,7 @@ node_modules
 
 .idea
 # testing
-/coverage
+**/coverage
 
 # production
 /build
@@ -85,3 +85,15 @@ Backups/*.sql
 Backups/*.tar
 
 .env
+
+Haraka/dkim/keys/private_base64.txt
+Haraka/dkim/keys/public_base64.txt
+
+.eslintcache
+
+HelmChart/Values/*.values.yaml
+
+Llama/Models/tokenizer*
+Llama/Models/llama*
+
+Llama/__pycache__/*

@@ -8,7 +8,6 @@ import DashboardSideMenu from './SideMenu';
 import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import ApiKeyPermission from 'Model/Models/ApiKeyPermission';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
-import IconProp from 'Common/Types/Icon/IconProp';
 import CardModelDetail from 'CommonUI/src/Components/ModelDetail/CardModelDetail';
 import ApiKey from 'Model/Models/ApiKey';
 import Navigation from 'CommonUI/src/Utils/Navigation';
@@ -21,7 +20,6 @@ import ModelDelete from 'CommonUI/src/Components/ModelDelete/ModelDelete';
 import ObjectID from 'Common/Types/ObjectID';
 import LabelsElement from '../../Components/Label/Labels';
 import BadDataException from 'Common/Types/Exception/BadDataException';
-import FormValues from 'CommonUI/src/Components/Forms/Types/FormValues';
 import JSONFunctions from 'Common/Types/JSONFunctions';
 import DashboardNavigation from '../../Utils/Navigation';
 const APIKeyView: FunctionComponent<PageComponentProps> = (
@@ -66,7 +64,6 @@ const APIKeyView: FunctionComponent<PageComponentProps> = (
                 cardProps={{
                     title: 'API Key Details',
                     description: 'Here are more details for this API Key.',
-                    icon: IconProp.Terminal,
                 }}
                 isEditable={true}
                 formFields={[
@@ -168,7 +165,6 @@ const APIKeyView: FunctionComponent<PageComponentProps> = (
                 isCreateable={true}
                 isViewable={false}
                 cardProps={{
-                    icon: IconProp.Lock,
                     title: 'API Key Permissions',
                     description:
                         'Add different permisisons to API keys to make it more granular.',
@@ -219,24 +215,6 @@ const APIKeyView: FunctionComponent<PageComponentProps> = (
                         title: 'Permission',
                         type: FieldType.Text,
                         isFilterable: true,
-                        showIf: (
-                            values: FormValues<ApiKeyPermission>
-                        ): boolean => {
-                            if (!values['permission']) {
-                                return false;
-                            }
-
-                            if (
-                                values['permission'] &&
-                                !PermissionHelper.isAccessControlPermission(
-                                    values['permission'] as Permission
-                                )
-                            ) {
-                                return false;
-                            }
-
-                            return true;
-                        },
                         getElement: (item: JSONObject): ReactElement => {
                             return (
                                 <p>

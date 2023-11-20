@@ -17,7 +17,7 @@ import Express, {
 // Connect common api's.
 import CommonAPI from '../API/Index';
 import NotFoundException from 'Common/Types/Exception/NotFoundException';
-
+import { JSONObject } from 'Common/Types/JSON';
 import OneUptimeDate from 'Common/Types/Date';
 import LocalCache from '../Infrastructure/LocalCache';
 import Exception from 'Common/Types/Exception/Exception';
@@ -26,13 +26,30 @@ import StatusCode from 'Common/Types/API/StatusCode';
 import Typeof from 'Common/Types/Typeof';
 import Response from './Response';
 import JSONFunctions from 'Common/Types/JSONFunctions';
-// import OpenTelemetrySDK from "./OpenTelemetry";
+import { AppVersion } from '../EnvironmentConfig';
+import ServerException from 'Common/Types/Exception/ServerException';
+import zlib from 'zlib';
+import CookieParser from 'cookie-parser';
+
+// Make sure we have stack trace for debugging.
+Error.stackTraceLimit = Infinity;
 
 const app: ExpressApplication = Express.getExpressApp();
 
 app.disable('x-powered-by');
 app.set('port', process.env['PORT']);
 app.set('view engine', 'ejs');
+app.use(CookieParser());
+
+const jsonBodyParserMiddleware: Function = ExpressJson({
+    limit: '50mb',
+    extended: true,
+}); // 50 MB limit.
+
+const urlEncodedMiddleware: Function = ExpressUrlEncoded({
+    limit: '50mb',
+    extended: true,
+}); // 50 MB limit.
 
 const logRequest: RequestHandler = (
     req: ExpressRequest,
@@ -42,22 +59,35 @@ const logRequest: RequestHandler = (
     (req as OneUptimeRequest).id = ObjectID.generate();
     (req as OneUptimeRequest).requestStartedAt = OneUptimeDate.getCurrentDate();
 
-    const method: string = req.method;
-    const url: string = req.url;
+    let requestBody: string =
+        req.body && req.headers['content-encoding'] !== 'gzip'
+            ? JSON.stringify(req.body)
+            : 'EMPTY';
 
-    const header_info: string = `Request ID: ${
-        (req as OneUptimeRequest).id
-    } -- POD NAME: ${
-        process.env['POD_NAME'] || 'NONE'
-    } -- METHOD: ${method} -- URL: ${url.toString()}`;
+    if (req.headers['content-encoding'] === 'gzip') {
+        requestBody = 'GZIP';
+    }
 
-    const body_info: string = `Request ID: ${
-        (req as OneUptimeRequest).id
-    } -- Request Body: ${
-        req.body ? JSON.stringify(req.body, null, 2) : 'EMPTY'
-    }`;
+    const oneUptimeRequest: OneUptimeRequest = req as OneUptimeRequest;
 
-    logger.info(header_info + '\n ' + body_info);
+    const method: string = oneUptimeRequest.method;
+    const path: string = oneUptimeRequest.originalUrl.toString();
+
+    const logLine: JSONObject = {
+        RequestID: `${oneUptimeRequest.id}`,
+
+        PodName: `${process.env['POD_NAME'] || 'NONE'}`,
+
+        HTTPMethod: `${method}`,
+
+        Path: `${path.toString()}`,
+
+        Host: `${oneUptimeRequest.hostname}`,
+
+        RequestBody: `${requestBody}`,
+    };
+
+    logger.info(logLine);
     next();
 };
 
@@ -88,8 +118,43 @@ app.use(setDefaultHeaders);
  * https://stackoverflow.com/questions/19917401/error-request-entity-too-large
  */
 
-app.use(ExpressJson({ limit: '50mb' }));
-app.use(ExpressUrlEncoded({ limit: '50mb' }));
+app.use((req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
+    if (req.headers['content-encoding'] === 'gzip') {
+        const buffers: any = [];
+
+        req.on('data', (chunk: any) => {
+            buffers.push(chunk);
+        });
+
+        req.on('end', () => {
+            const buffer: Buffer = Buffer.concat(buffers);
+            zlib.gunzip(buffer, (err: unknown, decoded: Buffer) => {
+                if (err) {
+                    logger.error(err);
+                    return Response.sendErrorResponse(
+                        req,
+                        res,
+                        new ServerException('Error decompressing data')
+                    );
+                }
+
+                req.body = decoded;
+
+                next();
+            });
+        });
+    } else {
+        jsonBodyParserMiddleware(req, res, next);
+    }
+});
+
+app.use((req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
+    if (req.headers['content-encoding'] === 'gzip') {
+        next();
+    } else {
+        urlEncodedMiddleware(req, res, next);
+    }
+});
 
 app.use(logRequest);
 
@@ -98,6 +163,8 @@ const init: Function = async (
     port?: Port,
     isFrontendApp?: boolean
 ): Promise<ExpressApplication> => {
+    logger.info(`App Version: ${AppVersion.toString()}`);
+
     await Express.launchApplication(appName, port);
     LocalCache.setString('app', 'name', appName);
     CommonAPI(appName);
@@ -107,7 +174,13 @@ const init: Function = async (
 
         app.get(
             [`/${appName}/env.js`, '/env.js'],
-            (req: ExpressRequest, res: ExpressResponse) => {
+            async (req: ExpressRequest, res: ExpressResponse) => {
+                // ping api server for database config.
+
+                const env: JSONObject = {
+                    ...process.env,
+                };
+
                 const script: string = `
     if(!window.process){
       window.process = {}
@@ -116,7 +189,7 @@ const init: Function = async (
     if(!window.process.env){
       window.process.env = {}
     }
-    const envVars = '${JSON.stringify(process.env)}';
+    const envVars = '${JSON.stringify(env)}';
     window.process.env = JSON.parse(envVars);
   `;
 

@@ -143,7 +143,6 @@ const StatusTimeline: FunctionComponent<PageComponentProps> = (
                     return Promise.resolve(item);
                 }}
                 cardProps={{
-                    icon: IconProp.List,
                     title: 'Status Timeline',
                     description: 'Here is the status timeline for this monitor',
                 }}
@@ -194,6 +193,7 @@ const StatusTimeline: FunctionComponent<PageComponentProps> = (
                                             'color'
                                         ] as Color
                                     }
+                                    shouldAnimate={false}
                                     text={
                                         (item['monitorStatus'] as JSONObject)[
                                             'name'
@@ -212,7 +212,7 @@ const StatusTimeline: FunctionComponent<PageComponentProps> = (
                     },
                 ]}
             />
-            {showViewLogsModal && (
+            {showViewLogsModal ? (
                 <Modal
                     title={'Why did the status change?'}
                     description="Here is more information about why the status changed for this monitor."
@@ -230,9 +230,11 @@ const StatusTimeline: FunctionComponent<PageComponentProps> = (
                         })}
                     </div>
                 </Modal>
+            ) : (
+                <></>
             )}
 
-            {showRootCause && (
+            {showRootCause ? (
                 <ConfirmModal
                     title={'Root Cause'}
                     description={rootCause}
@@ -243,6 +245,8 @@ const StatusTimeline: FunctionComponent<PageComponentProps> = (
                     submitButtonText={'Close'}
                     submitButtonType={ButtonStyleType.NORMAL}
                 />
+            ) : (
+                <></>
             )}
         </ModelPage>
     );

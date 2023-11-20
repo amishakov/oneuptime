@@ -9,7 +9,7 @@ import Navigation from '../../Utils/Navigation';
 export interface ComponentProps {
     children: ReactElement | Array<ReactElement> | string;
     className?: undefined | string;
-    to: Route | URL | null | undefined;
+    to?: Route | URL | null | undefined;
     onClick?: undefined | (() => void);
     onNavigateComplete?: (() => void) | undefined;
     openInNewTab?: boolean | undefined;
@@ -17,6 +17,7 @@ export interface ComponentProps {
     onMouseOver?: (() => void) | undefined;
     onMouseOut?: (() => void) | undefined;
     onMouseLeave?: (() => void) | undefined;
+    id?: string | undefined;
 }
 
 const Link: FunctionComponent<ComponentProps> = (
@@ -39,6 +40,7 @@ const Link: FunctionComponent<ComponentProps> = (
 
     return (
         <a
+            id={props.id}
             className={`cursor-pointer  ${props.className || ''}`}
             onMouseOver={props.onMouseOver}
             onMouseOut={props.onMouseOut}

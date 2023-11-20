@@ -7,11 +7,14 @@ import React, {
 
 import MonitorStatusTimeline from 'Model/Models/MonitorStatusTimeline';
 import ComponentLoader from '../ComponentLoader/ComponentLoader';
-import OneUptimeDate from 'Common/Types/Date';
-
 import DayUptimeGraph, { Event } from '../Graphs/DayUptimeGraph';
-import { Green } from 'Common/Types/BrandColors';
 import ErrorMessage from '../ErrorMessage/ErrorMessage';
+import ObjectID from 'Common/Types/ObjectID';
+import UptimeUtil from './UptimeUtil';
+
+export interface MonitorEvent extends Event {
+    monitorId: ObjectID;
+}
 
 export interface ComponentProps {
     startDate: Date;
@@ -29,26 +32,8 @@ const MonitorUptimeGraph: FunctionComponent<ComponentProps> = (
     const [events, setEvents] = useState<Array<Event>>([]);
 
     useEffect(() => {
-        const eventList: Array<Event> = [];
-        // convert data to events.
-        for (let i: number = 0; i < props.items.length; i++) {
-            if (!props.items[i]) {
-                break;
-            }
-
-            eventList.push({
-                startDate:
-                    props.items[i]!.createdAt || OneUptimeDate.getCurrentDate(),
-                endDate:
-                    props.items[i + 1] && props.items[i + 1]!.createdAt
-                        ? (props.items[i + 1]?.createdAt as Date)
-                        : OneUptimeDate.getCurrentDate(),
-                label: props.items[i]?.monitorStatus?.name || 'Operational',
-                priority: props.items[i]?.monitorStatus?.priority || 0,
-                color: props.items[i]?.monitorStatus?.color || Green,
-            });
-        }
-
+        const eventList: Array<Event> =
+            UptimeUtil.getNonOverlappingMonitorEvents(props.items);
         setEvents(eventList);
     }, [props.items]);
 

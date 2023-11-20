@@ -75,6 +75,7 @@ const IncidentViewStateTimeline: FunctionComponent<PageComponentProps> = (
                 modelType={IncidentStateTimeline}
                 id="table-incident-status-timeline"
                 name="Monitor > State Timeline"
+                isEditable={false}
                 isDeleteable={true}
                 isCreateable={true}
                 isViewable={false}
@@ -140,7 +141,6 @@ const IncidentViewStateTimeline: FunctionComponent<PageComponentProps> = (
                     return Promise.resolve(item);
                 }}
                 cardProps={{
-                    icon: IconProp.List,
                     title: 'Status Timeline',
                     description:
                         'Here is the status timeline for this incident',
@@ -210,7 +210,7 @@ const IncidentViewStateTimeline: FunctionComponent<PageComponentProps> = (
                     },
                 ]}
             />
-            {showViewLogsModal && (
+            {showViewLogsModal ? (
                 <Modal
                     title={'Why did the status change?'}
                     description="Here is more information about why the status changed for this monitor."
@@ -228,9 +228,11 @@ const IncidentViewStateTimeline: FunctionComponent<PageComponentProps> = (
                         })}
                     </div>
                 </Modal>
+            ) : (
+                <></>
             )}
 
-            {showRootCause && (
+            {showRootCause ? (
                 <ConfirmModal
                     title={'Root Cause'}
                     description={rootCause}
@@ -241,6 +243,8 @@ const IncidentViewStateTimeline: FunctionComponent<PageComponentProps> = (
                     submitButtonText={'Close'}
                     submitButtonType={ButtonStyleType.NORMAL}
                 />
+            ) : (
+                <></>
             )}
         </ModelPage>
     );

@@ -11,8 +11,6 @@ import AccordionGroup from 'CommonUI/src/Components/Accordion/AccordionGroup';
 import Alert from 'CommonUI/src/Components/Alerts/Alert';
 import URL from 'Common/Types/API/URL';
 import PageLoader from 'CommonUI/src/Components/Loader/PageLoader';
-import BaseAPI from 'CommonUI/src/Utils/API/API';
-import { DASHBOARD_API_URL } from 'CommonUI/src/Config';
 import { JSONArray, JSONObject } from 'Common/Types/JSON';
 import JSONFunctions from 'Common/Types/JSONFunctions';
 import ErrorMessage from 'CommonUI/src/Components/ErrorMessage/ErrorMessage';
@@ -20,7 +18,9 @@ import BadDataException from 'Common/Types/Exception/BadDataException';
 import LocalStorage from 'CommonUI/src/Utils/LocalStorage';
 import ObjectID from 'Common/Types/ObjectID';
 import StatusPageGroup from 'Model/Models/StatusPageGroup';
-import StatusPageResource from 'Model/Models/StatusPageResource';
+import StatusPageResource, {
+    UptimePrecision,
+} from 'Model/Models/StatusPageResource';
 import MonitorStatus from 'Model/Models/MonitorStatus';
 import MonitorStatusTimeline from 'Model/Models/MonitorStatusTimeline';
 import Incident from 'Model/Models/Incident';
@@ -39,7 +39,6 @@ import Route from 'Common/Types/API/Route';
 import ScheduledMaintenanceGroup from '../../Types/ScheduledMaintenanceGroup';
 import EventItem from 'CommonUI/src/Components/EventItem/EventItem';
 import HTTPResponse from 'Common/Types/API/HTTPResponse';
-import Monitor from 'Model/Models/Monitor';
 import Navigation from 'CommonUI/src/Utils/Navigation';
 import { getIncidentEventItem } from '../Incidents/Detail';
 import { getScheduledEventEventItem } from '../ScheduledEvent/Detail';
@@ -51,6 +50,8 @@ import StatusPage from 'Model/Models/StatusPage';
 import MarkdownViewer from 'CommonUI/src/Components/Markdown.tsx/MarkdownViewer';
 import StatusPageUtil from '../../Utils/StatusPage';
 import HTTPErrorResponse from 'Common/Types/API/HTTPErrorResponse';
+import { STATUS_PAGE_API_URL } from '../../Utils/Config';
+import Section from '../../Components/Section/Section';
 
 const Overview: FunctionComponent<PageComponentProps> = (
     props: PageComponentProps
@@ -111,6 +112,13 @@ const Overview: FunctionComponent<PageComponentProps> = (
         null
     );
 
+    const [monitorsInGroup, setMonitorsInGroup] = useState<
+        Dictionary<Array<ObjectID>>
+    >({});
+
+    const [monitorGroupCurrentStatuses, setMonitorGroupCurrentStatuses] =
+        useState<Dictionary<ObjectID>>({});
+
     StatusPageUtil.checkIfUserHasLoggedIn();
 
     const loadPage: Function = async () => {
@@ -127,13 +135,22 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 throw new BadDataException('Status Page ID is required');
             }
             const response: HTTPResponse<JSONObject> =
-                await BaseAPI.post<JSONObject>(
-                    URL.fromString(DASHBOARD_API_URL.toString()).addRoute(
-                        `/status-page/overview/${id.toString()}`
+                await API.post<JSONObject>(
+                    URL.fromString(STATUS_PAGE_API_URL.toString()).addRoute(
+                        `/overview/${id.toString()}`
                     ),
                     {},
                     API.getDefaultHeaders(StatusPageUtil.getStatusPageId()!)
                 );
+
+            if (!response.isSuccess()) {
+                throw response;
+            }
+
+            if (!response.isSuccess()) {
+                throw response;
+            }
+
             const data: JSONObject = response.data;
 
             const scheduledMaintenanceEventsPublicNotes: Array<ScheduledMaintenancePublicNote> =
@@ -193,12 +210,26 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 (data['statusPage'] as JSONObject) || [],
                 StatusPage
             );
+
             const scheduledMaintenanceStateTimelines: Array<ScheduledMaintenanceStateTimeline> =
                 JSONFunctions.fromJSONArray(
                     (data['scheduledMaintenanceStateTimelines'] as JSONArray) ||
                         [],
                     ScheduledMaintenanceStateTimeline
                 );
+
+            const monitorsInGroup: Dictionary<Array<ObjectID>> =
+                JSONFunctions.deserialize(
+                    (data['monitorsInGroup'] as JSONObject) || {}
+                ) as Dictionary<Array<ObjectID>>;
+
+            const monitorGroupCurrentStatuses: Dictionary<ObjectID> =
+                JSONFunctions.deserialize(
+                    (data['monitorGroupCurrentStatuses'] as JSONObject) || {}
+                ) as Dictionary<ObjectID>;
+
+            setMonitorsInGroup(monitorsInGroup);
+            setMonitorGroupCurrentStatuses(monitorGroupCurrentStatuses);
 
             // save data. set()
             setScheduledMaintenanceEventsPublicNotes(
@@ -222,17 +253,21 @@ const Overview: FunctionComponent<PageComponentProps> = (
 
             // Parse Data.
             setCurrentStatus(
-                getOverallMonitorStatus(statusPageResources, monitorStatuses)
+                getOverallMonitorStatus(
+                    statusPageResources,
+                    monitorStatuses,
+                    monitorGroupCurrentStatuses
+                )
             );
 
             setIsLoading(false);
             props.onLoadComplete();
         } catch (err) {
             if (err instanceof HTTPErrorResponse) {
-                StatusPageUtil.checkIfTheUserIsAuthenticated(err);
+                await StatusPageUtil.checkIfTheUserIsAuthenticated(err);
             }
 
-            setError(BaseAPI.getFriendlyMessage(err));
+            setError(API.getFriendlyMessage(err));
             setIsLoading(false);
         }
     };
@@ -251,12 +286,14 @@ const Overview: FunctionComponent<PageComponentProps> = (
 
     const getOverallMonitorStatus: Function = (
         statusPageResources: Array<StatusPageResource>,
-        monitorStatuses: Array<MonitorStatus>
+        monitorStatuses: Array<MonitorStatus>,
+        monitorGroupCurrentStatuses: Dictionary<ObjectID>
     ): MonitorStatus | null => {
         let currentStatus: MonitorStatus | null =
             monitorStatuses.length > 0 && monitorStatuses[0]
                 ? monitorStatuses[0]
                 : null;
+
         const dict: Dictionary<number> = {};
 
         for (const resource of statusPageResources) {
@@ -272,6 +309,21 @@ const Overview: FunctionComponent<PageComponentProps> = (
                     ] = 1;
                 } else {
                     dict[resource.monitor?.currentMonitorStatusId.toString()]++;
+                }
+            }
+        }
+
+        // check status of monitor groups.
+
+        for (const groupId in monitorGroupCurrentStatuses) {
+            const statusId: ObjectID | undefined =
+                monitorGroupCurrentStatuses[groupId];
+
+            if (statusId) {
+                if (!Object.keys(dict).includes(statusId.toString() || '')) {
+                    dict[statusId.toString()] = 1;
+                } else {
+                    dict[statusId.toString()]++;
                 }
             }
         }
@@ -308,46 +360,135 @@ const Overview: FunctionComponent<PageComponentProps> = (
                         resource.statusPageGroupId.toString()) ||
                 (!resource.statusPageGroupId && !group)
             ) {
-                let currentStatus: MonitorStatus | undefined =
-                    monitorStatuses.find((status: MonitorStatus) => {
-                        return (
-                            status._id?.toString() ===
-                            resource.monitor?.currentMonitorStatusId?.toString()
-                        );
-                    });
+                // if its not a monitor or a monitor group, then continue. This should ideally not happen.
 
-                if (!currentStatus) {
-                    currentStatus = new MonitorStatus();
-                    currentStatus.name = 'Operational';
-                    currentStatus.color = Green;
+                if (!resource.monitor && !resource.monitorGroupId) {
+                    continue;
                 }
 
-                elements.push(
-                    <MonitorOverview
-                        key={Math.random()}
-                        monitorName={
-                            resource.displayName ||
-                            resource.monitor?.name! ||
-                            ''
-                        }
-                        description={resource.displayDescription || ''}
-                        tooltip={resource.displayTooltip || ''}
-                        monitorStatus={currentStatus}
-                        monitorStatusTimeline={[
-                            ...monitorStatusTimelines,
-                        ].filter((timeline: MonitorStatusTimeline) => {
+                // if its a monitor
+
+                if (resource.monitor) {
+                    let currentStatus: MonitorStatus | undefined =
+                        monitorStatuses.find((status: MonitorStatus) => {
                             return (
-                                timeline.monitorId?.toString() ===
-                                resource.monitorId?.toString()
+                                status._id?.toString() ===
+                                resource.monitor?.currentMonitorStatusId?.toString()
                             );
-                        })}
-                        startDate={startDate}
-                        endDate={endDate}
-                        showHistoryChart={resource.showStatusHistoryChart}
-                        showCurrentStatus={resource.showCurrentStatus}
-                        uptimeGraphHeight={10}
-                    />
-                );
+                        });
+
+                    if (!currentStatus) {
+                        currentStatus = new MonitorStatus();
+                        currentStatus.name = 'Operational';
+                        currentStatus.color = Green;
+                    }
+
+                    elements.push(
+                        <MonitorOverview
+                            key={Math.random()}
+                            monitorName={
+                                resource.displayName ||
+                                resource.monitor?.name ||
+                                ''
+                            }
+                            description={resource.displayDescription || ''}
+                            tooltip={resource.displayTooltip || ''}
+                            currentStatus={currentStatus}
+                            monitorStatuses={monitorStatuses}
+                            showUptimePercent={Boolean(
+                                resource.showUptimePercent
+                            )}
+                            uptimePrecision={
+                                resource.uptimePercentPrecision ||
+                                UptimePrecision.ONE_DECIMAL
+                            }
+                            monitorStatusTimeline={[
+                                ...monitorStatusTimelines,
+                            ].filter((timeline: MonitorStatusTimeline) => {
+                                return (
+                                    timeline.monitorId?.toString() ===
+                                    resource.monitorId?.toString()
+                                );
+                            })}
+                            startDate={startDate}
+                            endDate={endDate}
+                            showHistoryChart={resource.showStatusHistoryChart}
+                            showCurrentStatus={resource.showCurrentStatus}
+                            uptimeGraphHeight={10}
+                        />
+                    );
+                }
+
+                // if its a monitor group, then...
+
+                if (resource.monitorGroupId) {
+                    let currentStatus: MonitorStatus | undefined =
+                        monitorStatuses.find((status: MonitorStatus) => {
+                            return (
+                                status._id?.toString() ===
+                                monitorGroupCurrentStatuses[
+                                    resource.monitorGroupId?.toString() || ''
+                                ]?.toString()
+                            );
+                        });
+
+                    if (!currentStatus) {
+                        currentStatus = new MonitorStatus();
+                        currentStatus.name = 'Operational';
+                        currentStatus.color = Green;
+                    }
+
+                    elements.push(
+                        <MonitorOverview
+                            key={Math.random()}
+                            monitorName={
+                                resource.displayName ||
+                                resource.monitor?.name ||
+                                ''
+                            }
+                            showUptimePercent={Boolean(
+                                resource.showUptimePercent
+                            )}
+                            uptimePrecision={
+                                resource.uptimePercentPrecision ||
+                                UptimePrecision.ONE_DECIMAL
+                            }
+                            description={resource.displayDescription || ''}
+                            tooltip={resource.displayTooltip || ''}
+                            currentStatus={currentStatus}
+                            monitorStatuses={monitorStatuses}
+                            monitorStatusTimeline={[
+                                ...monitorStatusTimelines,
+                            ].filter((timeline: MonitorStatusTimeline) => {
+                                const monitorsInThisGroup:
+                                    | Array<ObjectID>
+                                    | undefined =
+                                    monitorsInGroup[
+                                        resource.monitorGroupId?.toString() ||
+                                            ''
+                                    ];
+
+                                if (!monitorsInThisGroup) {
+                                    return false;
+                                }
+
+                                return monitorsInThisGroup.find(
+                                    (monitorId: ObjectID) => {
+                                        return (
+                                            monitorId.toString() ===
+                                            timeline.monitorId?.toString()
+                                        );
+                                    }
+                                );
+                            })}
+                            startDate={startDate}
+                            endDate={endDate}
+                            showHistoryChart={resource.showStatusHistoryChart}
+                            showCurrentStatus={resource.showCurrentStatus}
+                            uptimeGraphHeight={10}
+                        />
+                    );
+                }
             }
         }
 
@@ -384,20 +525,10 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 throw new BadDataException('Incident Timeline not found.');
             }
 
-            const monitorIds: Array<string | undefined> =
-                activeIncident.monitors?.map((monitor: Monitor) => {
-                    return monitor._id;
-                }) || [];
-
-            const namesOfResources: Array<StatusPageResource> =
-                statusPageResources.filter((resource: StatusPageResource) => {
-                    return monitorIds.includes(resource.monitorId?.toString());
-                });
-
             const group: IncidentGroup = {
                 incident: activeIncident,
                 incidentState: activeIncident.currentIncidentState,
-                incidentResources: namesOfResources,
+                incidentResources: statusPageResources,
                 publicNotes: incidentPublicNotes.filter(
                     (publicNote: IncidentPublicNote) => {
                         return (
@@ -408,6 +539,7 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 ),
                 incidentSeverity: activeIncident.incidentSeverity!,
                 incidentStateTimelines: [timeline],
+                monitorsInGroup: monitorsInGroup,
             };
 
             groups.push(group);
@@ -441,25 +573,11 @@ const Overview: FunctionComponent<PageComponentProps> = (
                     throw new BadDataException('Incident Timeline not found.');
                 }
 
-                const monitorIds: Array<string | undefined> =
-                    activeEvent.monitors?.map((monitor: Monitor) => {
-                        return monitor._id;
-                    }) || [];
-
-                const namesOfResources: Array<StatusPageResource> =
-                    statusPageResources.filter(
-                        (resource: StatusPageResource) => {
-                            return monitorIds.includes(
-                                resource.monitorId?.toString()
-                            );
-                        }
-                    );
-
                 const group: ScheduledMaintenanceGroup = {
                     scheduledMaintenance: activeEvent,
                     scheduledMaintenanceState:
                         activeEvent.currentScheduledMaintenanceState,
-                    scheduledEventResources: namesOfResources,
+                    scheduledEventResources: statusPageResources,
                     publicNotes: scheduledMaintenanceEventsPublicNotes.filter(
                         (publicNote: ScheduledMaintenancePublicNote) => {
                             return (
@@ -469,6 +587,7 @@ const Overview: FunctionComponent<PageComponentProps> = (
                         }
                     ),
                     scheduledMaintenanceStateTimelines: [timeline],
+                    monitorsInGroup: monitorsInGroup,
                 };
 
                 groups.push(group);
@@ -534,6 +653,11 @@ const Overview: FunctionComponent<PageComponentProps> = (
         return <></>;
     };
 
+    const activeIncidentsInIncidentGroup: Array<IncidentGroup> =
+        getActiveIncidents();
+    const activeScheduledMaintenanceEventsInScheduledMaintenanceGroup: Array<ScheduledMaintenanceGroup> =
+        getOngoingScheduledEvents();
+
     return (
         <Page>
             {isLoading ? <PageLoader isVisible={true} /> : <></>}
@@ -543,7 +667,10 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 <div>
                     {/* Overview Page Description */}
                     {statusPage && statusPage.overviewPageDescription && (
-                        <div className="bg-white p-5 my-5 rounded-xl shadow">
+                        <div
+                            id="status-page-description"
+                            className="bg-white p-5 my-5 rounded-xl shadow"
+                        >
                             <MarkdownViewer
                                 text={statusPage.overviewPageDescription}
                             />
@@ -551,66 +678,26 @@ const Overview: FunctionComponent<PageComponentProps> = (
                     )}
 
                     {/* Load Active Announcement */}
-                    {activeAnnouncements.map(
-                        (announcement: StatusPageAnnouncement, i: number) => {
-                            return (
-                                <EventItem
-                                    isDetailItem={false}
-                                    key={i}
-                                    {...getAnnouncementEventItem(
-                                        announcement,
-                                        StatusPageUtil.isPreviewPage(),
-                                        true
-                                    )}
-                                />
-                            );
-                        }
-                    )}
-
-                    {/* Load Active Incident */}
-
-                    {getActiveIncidents().map(
-                        (incidentGroup: IncidentGroup, i: number) => {
-                            return (
-                                <EventItem
-                                    isDetailItem={false}
-                                    key={i}
-                                    {...getIncidentEventItem(
-                                        incidentGroup.incident,
-                                        incidentGroup.publicNotes,
-                                        incidentGroup.incidentStateTimelines,
-                                        incidentGroup.incidentResources,
-                                        StatusPageUtil.isPreviewPage(),
-                                        true
-                                    )}
-                                />
-                            );
-                        }
-                    )}
-
-                    {/* Load Active ScheduledEvent */}
-
-                    {getOngoingScheduledEvents().map(
-                        (
-                            scheduledEventGroup: ScheduledMaintenanceGroup,
-                            i: number
-                        ) => {
-                            return (
-                                <EventItem
-                                    key={i}
-                                    isDetailItem={false}
-                                    {...getScheduledEventEventItem(
-                                        scheduledEventGroup.scheduledMaintenance,
-                                        scheduledEventGroup.publicNotes,
-                                        scheduledEventGroup.scheduledMaintenanceStateTimelines,
-                                        scheduledEventGroup.scheduledEventResources,
-                                        StatusPageUtil.isPreviewPage(),
-                                        true
-                                    )}
-                                />
-                            );
-                        }
-                    )}
+                    <div id="announcements-list">
+                        {activeAnnouncements.map(
+                            (
+                                announcement: StatusPageAnnouncement,
+                                i: number
+                            ) => {
+                                return (
+                                    <EventItem
+                                        isDetailItem={false}
+                                        key={i}
+                                        {...getAnnouncementEventItem(
+                                            announcement,
+                                            StatusPageUtil.isPreviewPage(),
+                                            true
+                                        )}
+                                    />
+                                );
+                            }
+                        )}
+                    </div>
 
                     <div>
                         {currentStatus && statusPageResources.length > 0 && (
@@ -628,12 +715,13 @@ const Overview: FunctionComponent<PageComponentProps> = (
                                 color={currentStatus.color}
                                 doNotShowIcon={true}
                                 textClassName="text-white text-lg"
+                                id="overview-alert"
                             />
                         )}
                     </div>
 
                     {statusPageResources.length > 0 && (
-                        <div className="bg-white pl-5 pr-5 mt-5 rounded-xl shadow space-y-5">
+                        <div className="bg-white pl-5 pr-5 mt-5 rounded-xl shadow space-y-5 mb-6">
                             <AccordionGroup>
                                 {statusPageResources.filter(
                                     (resources: StatusPageResource) => {
@@ -697,16 +785,75 @@ const Overview: FunctionComponent<PageComponentProps> = (
                         </div>
                     )}
 
-                    {getActiveIncidents().length === 0 &&
-                        getOngoingScheduledEvents().length === 0 &&
+                    {/* Load Active Incident */}
+                    {activeIncidentsInIncidentGroup.length > 0 && (
+                        <div id="incidents-list mt-2">
+                            <Section title="Active Incidents" />
+                            {activeIncidentsInIncidentGroup.map(
+                                (incidentGroup: IncidentGroup, i: number) => {
+                                    return (
+                                        <EventItem
+                                            isDetailItem={false}
+                                            key={i}
+                                            {...getIncidentEventItem(
+                                                incidentGroup.incident,
+                                                incidentGroup.publicNotes,
+                                                incidentGroup.incidentStateTimelines,
+                                                incidentGroup.incidentResources,
+                                                incidentGroup.monitorsInGroup,
+                                                StatusPageUtil.isPreviewPage(),
+                                                true
+                                            )}
+                                        />
+                                    );
+                                }
+                            )}
+                        </div>
+                    )}
+
+                    {/* Load Active ScheduledEvent */}
+                    {activeScheduledMaintenanceEventsInScheduledMaintenanceGroup &&
+                        activeScheduledMaintenanceEventsInScheduledMaintenanceGroup.length >
+                            0 && (
+                            <div id="scheduled-events-list mt-2">
+                                <Section title="Scheduled Maintenance Events" />
+                                {activeScheduledMaintenanceEventsInScheduledMaintenanceGroup.map(
+                                    (
+                                        scheduledEventGroup: ScheduledMaintenanceGroup,
+                                        i: number
+                                    ) => {
+                                        return (
+                                            <EventItem
+                                                key={i}
+                                                isDetailItem={false}
+                                                {...getScheduledEventEventItem(
+                                                    scheduledEventGroup.scheduledMaintenance,
+                                                    scheduledEventGroup.publicNotes,
+                                                    scheduledEventGroup.scheduledMaintenanceStateTimelines,
+                                                    scheduledEventGroup.scheduledEventResources,
+                                                    scheduledEventGroup.monitorsInGroup,
+                                                    StatusPageUtil.isPreviewPage(),
+                                                    true
+                                                )}
+                                            />
+                                        );
+                                    }
+                                )}
+                            </div>
+                        )}
+
+                    {activeIncidentsInIncidentGroup.length === 0 &&
+                        activeScheduledMaintenanceEventsInScheduledMaintenanceGroup.length ===
+                            0 &&
                         statusPageResources.length === 0 &&
                         activeAnnouncements.length === 0 &&
                         !isLoading &&
                         !error && (
                             <EmptyState
+                                id="overview-empty-state"
                                 icon={IconProp.CheckCircle}
                                 title={'Everything looks great'}
-                                description="Everything is great. Nothig posted on this status page so far."
+                                description="No resources added to this status page yet. Please add some resources from the dashboard."
                             />
                         )}
                 </div>

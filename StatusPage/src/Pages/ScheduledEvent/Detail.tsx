@@ -8,8 +8,6 @@ import PageComponentProps from '../PageComponentProps';
 import Page from '../../Components/Page/Page';
 import URL from 'Common/Types/API/URL';
 import PageLoader from 'CommonUI/src/Components/Loader/PageLoader';
-import BaseAPI from 'CommonUI/src/Utils/API/API';
-import { DASHBOARD_API_URL } from 'CommonUI/src/Config';
 import useAsyncEffect from 'use-async-effect';
 import { JSONArray, JSONObject } from 'Common/Types/JSON';
 import JSONFunctions from 'Common/Types/JSONFunctions';
@@ -17,7 +15,6 @@ import ErrorMessage from 'CommonUI/src/Components/ErrorMessage/ErrorMessage';
 import BadDataException from 'Common/Types/Exception/BadDataException';
 import LocalStorage from 'CommonUI/src/Utils/LocalStorage';
 import ObjectID from 'Common/Types/ObjectID';
-import StatusPageResource from 'Model/Models/StatusPageResource';
 import ScheduledMaintenance from 'Model/Models/ScheduledMaintenance';
 import ScheduledMaintenancePublicNote from 'Model/Models/ScheduledMaintenancePublicNote';
 import OneUptimeDate from 'Common/Types/Date';
@@ -39,11 +36,18 @@ import IconProp from 'Common/Types/Icon/IconProp';
 import API from '../../Utils/API';
 import StatusPageUtil from '../../Utils/StatusPage';
 import HTTPErrorResponse from 'Common/Types/API/HTTPErrorResponse';
+import { STATUS_PAGE_API_URL } from '../../Utils/Config';
+import StatusPageResource from 'Model/Models/StatusPageResource';
+import Dictionary from 'Common/Types/Dictionary';
+import Monitor from 'Model/Models/Monitor';
+import Label from 'Model/Models/Label';
 
 export const getScheduledEventEventItem: Function = (
     scheduledMaintenance: ScheduledMaintenance,
     scheduledMaintenanceEventsPublicNotes: Array<ScheduledMaintenancePublicNote>,
     scheduledMaintenanceStateTimelines: Array<ScheduledMaintenanceStateTimeline>,
+    statusPageResources: Array<StatusPageResource>,
+    monitorsInGroup: Dictionary<Array<ObjectID>>,
     isPreviewPage: boolean,
     isSummary: boolean
 ): EventItemComponentProps => {
@@ -89,7 +93,7 @@ export const getScheduledEventEventItem: Function = (
         ) {
             timeline.push({
                 note: scheduledMaintenancePublicNote?.note || '',
-                date: scheduledMaintenancePublicNote?.createdAt!,
+                date: scheduledMaintenancePublicNote?.createdAt as Date,
                 type: TimelineItemType.Note,
                 icon: IconProp.Chat,
                 iconColor: Grey,
@@ -112,7 +116,7 @@ export const getScheduledEventEventItem: Function = (
                 date: scheduledMaintenanceEventstateTimeline
                     .scheduledMaintenanceState?.isScheduledState
                     ? scheduledMaintenance.startsAt!
-                    : scheduledMaintenanceEventstateTimeline?.createdAt!,
+                    : (scheduledMaintenanceEventstateTimeline?.createdAt as Date),
                 type: TimelineItemType.StateChange,
                 icon: scheduledMaintenanceEventstateTimeline
                     .scheduledMaintenanceState.isScheduledState
@@ -148,11 +152,69 @@ export const getScheduledEventEventItem: Function = (
         return OneUptimeDate.isAfter(a.date, b.date) === true ? 1 : -1;
     });
 
+    let namesOfResources: Array<StatusPageResource> = [];
+
+    if (scheduledMaintenance.monitors) {
+        const monitorIdsInThisScheduledMaintenance: Array<string> =
+            scheduledMaintenance.monitors
+                .map((monitor: Monitor) => {
+                    return monitor.id!.toString();
+                })
+                .filter((id: string) => {
+                    return Boolean(id);
+                });
+
+        namesOfResources = statusPageResources.filter(
+            (resource: StatusPageResource) => {
+                return (
+                    resource.monitorId &&
+                    monitorIdsInThisScheduledMaintenance.includes(
+                        resource.monitorId.toString()
+                    )
+                );
+            }
+        );
+
+        // add names of the groups as well.
+        namesOfResources = namesOfResources.concat(
+            statusPageResources.filter((resource: StatusPageResource) => {
+                if (!resource.monitorGroupId) {
+                    return false;
+                }
+
+                const monitorGroupId: string =
+                    resource.monitorGroupId.toString();
+
+                const monitorIdsInThisGroup: Array<ObjectID> =
+                    monitorsInGroup[monitorGroupId]!;
+
+                for (const monitorId of monitorIdsInThisGroup) {
+                    if (
+                        monitorIdsInThisScheduledMaintenance.find(
+                            (id: string | undefined) => {
+                                return id?.toString() === monitorId.toString();
+                            }
+                        )
+                    ) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })
+        );
+    }
+
     return {
         eventTitle: scheduledMaintenance.title || '',
         eventDescription: scheduledMaintenance.description,
         eventTimeline: timeline,
         eventType: 'Scheduled Maintenance',
+        eventResourcesAffected: namesOfResources.map(
+            (i: StatusPageResource) => {
+                return i.displayName || '';
+            }
+        ),
         eventViewRoute: !isSummary
             ? undefined
             : RouteUtil.populateRouteParams(
@@ -173,6 +235,13 @@ export const getScheduledEventEventItem: Function = (
                   scheduledMaintenance.startsAt!
               )
             : '',
+        labels:
+            scheduledMaintenance.labels?.map((label: Label) => {
+                return {
+                    name: label.name!,
+                    color: label.color!,
+                };
+            }) || [],
     };
 };
 
@@ -181,9 +250,6 @@ const Overview: FunctionComponent<PageComponentProps> = (
 ): ReactElement => {
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [_statusPageResources, setStatusPageResources] = useState<
-        Array<StatusPageResource>
-    >([]);
     const [
         scheduledMaintenanceEventsPublicNotes,
         setscheduledMaintenanceEventsPublicNotes,
@@ -196,6 +262,14 @@ const Overview: FunctionComponent<PageComponentProps> = (
     ] = useState<Array<ScheduledMaintenanceStateTimeline>>([]);
     const [parsedData, setParsedData] =
         useState<EventItemComponentProps | null>(null);
+
+    const [monitorsInGroup, setMonitorsInGroup] = useState<
+        Dictionary<Array<ObjectID>>
+    >({});
+
+    const [statusPageResources, setStatusPageResources] = useState<
+        Array<StatusPageResource>
+    >([]);
 
     StatusPageUtil.checkIfUserHasLoggedIn();
 
@@ -217,13 +291,17 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 Navigation.getLastParamAsObjectID().toString();
 
             const response: HTTPResponse<JSONObject> =
-                await BaseAPI.post<JSONObject>(
-                    URL.fromString(DASHBOARD_API_URL.toString()).addRoute(
-                        `/status-page/scheduled-maintenance-events/${id.toString()}/${eventId}`
+                await API.post<JSONObject>(
+                    URL.fromString(STATUS_PAGE_API_URL.toString()).addRoute(
+                        `/scheduled-maintenance-events/${id.toString()}/${eventId}`
                     ),
                     {},
                     API.getDefaultHeaders(StatusPageUtil.getStatusPageId()!)
                 );
+
+            if (!response.isSuccess()) {
+                throw response;
+            }
             const data: JSONObject = response.data;
 
             const scheduledMaintenanceEventsPublicNotes: Array<ScheduledMaintenancePublicNote> =
@@ -242,11 +320,6 @@ const Overview: FunctionComponent<PageComponentProps> = (
                     (rawAnnouncements[0] as JSONObject) || {},
                     ScheduledMaintenance
                 );
-            const statusPageResources: Array<StatusPageResource> =
-                JSONFunctions.fromJSONArray(
-                    (data['statusPageResources'] as JSONArray) || [],
-                    StatusPageResource
-                );
             const scheduledMaintenanceStateTimelines: Array<ScheduledMaintenanceStateTimeline> =
                 JSONFunctions.fromJSONArray(
                     (data['scheduledMaintenanceStateTimelines'] as JSONArray) ||
@@ -254,23 +327,37 @@ const Overview: FunctionComponent<PageComponentProps> = (
                     ScheduledMaintenanceStateTimeline
                 );
 
+            const statusPageResources: Array<StatusPageResource> =
+                JSONFunctions.fromJSONArray(
+                    (data['statusPageResources'] as JSONArray) || [],
+                    StatusPageResource
+                );
+
+            const monitorsInGroup: Dictionary<Array<ObjectID>> =
+                JSONFunctions.deserialize(
+                    (data['monitorsInGroup'] as JSONObject) || {}
+                ) as Dictionary<Array<ObjectID>>;
+
             // save data. set()
             setscheduledMaintenanceEventsPublicNotes(
                 scheduledMaintenanceEventsPublicNotes
             );
             setscheduledMaintenanceEvent(scheduledMaintenanceEvent);
             setStatusPageResources(statusPageResources);
+
             setscheduledMaintenanceStateTimelines(
                 scheduledMaintenanceStateTimelines
             );
+
+            setMonitorsInGroup(monitorsInGroup);
 
             setIsLoading(false);
             props.onLoadComplete();
         } catch (err) {
             if (err instanceof HTTPErrorResponse) {
-                StatusPageUtil.checkIfTheUserIsAuthenticated(err);
+                await StatusPageUtil.checkIfTheUserIsAuthenticated(err);
             }
-            setError(BaseAPI.getFriendlyMessage(err));
+            setError(API.getFriendlyMessage(err));
             setIsLoading(false);
         }
     }, []);
@@ -290,6 +377,8 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 scheduledMaintenanceEvent,
                 scheduledMaintenanceEventsPublicNotes,
                 scheduledMaintenanceStateTimelines,
+                statusPageResources,
+                monitorsInGroup,
                 Boolean(StatusPageUtil.isPreviewPage())
             )
         );
@@ -347,6 +436,7 @@ const Overview: FunctionComponent<PageComponentProps> = (
             {scheduledMaintenanceEvent ? <EventItem {...parsedData} /> : <></>}
             {!scheduledMaintenanceEvent ? (
                 <EmptyState
+                    id="scheduled-event-empty-state"
                     title={'No Scheduled Event'}
                     description={
                         'No scheduled event found for this status page.'

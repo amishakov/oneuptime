@@ -4,7 +4,7 @@ import {
     EVERY_MINUTE,
 } from 'Common/Utils/CronTime';
 import RunCron from '../../Utils/Cron';
-import { IsDevelopment } from 'CommonServer/Config';
+import { IsDevelopment } from 'CommonServer/EnvironmentConfig';
 import StatusPageDomain from 'Model/Models/StatusPageDomain';
 import StatusPageDomainService from 'CommonServer/Services/StatusPageDomainService';
 // @ts-ignore
@@ -25,8 +25,8 @@ import LIMIT_MAX from 'Common/Types/Database/LimitMax';
 import axios, { AxiosResponse } from 'axios';
 import GreenlockCertificate from 'Model/Models/GreenlockCertificate';
 import GreenlockCertificateService from 'CommonServer/Services/GreenlockCertificateService';
-import fs from 'fs';
 import SelfSignedSSL from '../../Utils/SelfSignedSSL';
+import LocalFile from 'CommonServer/Utils/LocalFile';
 
 const router: ExpressRouter = Express.getRouter();
 
@@ -343,7 +343,10 @@ RunCron(
 
 RunCron(
     'StatusPageCerts:WriteSelfSignedCertsToDisk',
-    EVERY_FIVE_MINUTE,
+    {
+        schedule: IsDevelopment ? EVERY_MINUTE : EVERY_FIVE_MINUTE,
+        runOnStartup: true,
+    },
     async () => {
         // Fetch all domains where certs are added to greenlock.
 
@@ -463,12 +466,23 @@ RunCron(
                     ]) as string;
             }
 
+            // Need to make sure StatusPageCerts dir exists.
+
+            try {
+                await LocalFile.makeDirectory('/usr/src/Certs/StatusPageCerts');
+            } catch (err) {
+                // directory already exists, ignore.
+                logger.error('Create directory err');
+                logger.error(err);
+            }
+
             // Write to disk.
-            fs.writeFileSync(
+            await LocalFile.write(
                 `/usr/src/Certs/StatusPageCerts/${cert.key}.crt`,
                 crt
             );
-            fs.writeFileSync(
+
+            await LocalFile.write(
                 `/usr/src/Certs/StatusPageCerts/${cert.key}.key`,
                 key
             );

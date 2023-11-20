@@ -8,8 +8,6 @@ import PageComponentProps from '../PageComponentProps';
 import Page from '../../Components/Page/Page';
 import URL from 'Common/Types/API/URL';
 import PageLoader from 'CommonUI/src/Components/Loader/PageLoader';
-import BaseAPI from 'CommonUI/src/Utils/API/API';
-import { DASHBOARD_API_URL } from 'CommonUI/src/Config';
 import useAsyncEffect from 'use-async-effect';
 import { JSONArray, JSONObject } from 'Common/Types/JSON';
 import ErrorMessage from 'CommonUI/src/Components/ErrorMessage/ErrorMessage';
@@ -37,6 +35,9 @@ import PageMap from '../../Utils/PageMap';
 import API from '../../Utils/API';
 import StatusPageUtil from '../../Utils/StatusPage';
 import HTTPErrorResponse from 'Common/Types/API/HTTPErrorResponse';
+import { STATUS_PAGE_API_URL } from '../../Utils/Config';
+import Section from '../../Components/Section/Section';
+import IncidentState from 'Model/Models/IncidentState';
 
 const Overview: FunctionComponent<PageComponentProps> = (
     props: PageComponentProps
@@ -53,8 +54,20 @@ const Overview: FunctionComponent<PageComponentProps> = (
     const [incidentStateTimelines, setIncidentStateTimelines] = useState<
         Array<IncidentStateTimeline>
     >([]);
-    const [parsedData, setParsedData] =
+
+    const [parsedActiveIncidentsData, setParsedActiveIncidentsData] =
         useState<EventHistoryListComponentProps | null>(null);
+
+    const [parsedResolvedIncidentsData, setParsedResolvedIncidentsData] =
+        useState<EventHistoryListComponentProps | null>(null);
+
+    const [monitorsInGroup, setMonitorsInGroup] = useState<
+        Dictionary<Array<ObjectID>>
+    >({});
+
+    const [incidentStates, setIncidentStates] = useState<Array<IncidentState>>(
+        []
+    );
 
     StatusPageUtil.checkIfUserHasLoggedIn();
 
@@ -72,13 +85,18 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 throw new BadDataException('Status Page ID is required');
             }
             const response: HTTPResponse<JSONObject> =
-                await BaseAPI.post<JSONObject>(
-                    URL.fromString(DASHBOARD_API_URL.toString()).addRoute(
-                        `/status-page/incidents/${id.toString()}`
+                await API.post<JSONObject>(
+                    URL.fromString(STATUS_PAGE_API_URL.toString()).addRoute(
+                        `/incidents/${id.toString()}`
                     ),
                     {},
                     API.getDefaultHeaders(StatusPageUtil.getStatusPageId()!)
                 );
+
+            if (!response.isSuccess()) {
+                throw response;
+            }
+
             const data: JSONObject = response.data;
 
             const incidentPublicNotes: Array<IncidentPublicNote> =
@@ -101,6 +119,20 @@ const Overview: FunctionComponent<PageComponentProps> = (
                     IncidentStateTimeline
                 );
 
+            const monitorsInGroup: Dictionary<Array<ObjectID>> =
+                JSONFunctions.deserialize(
+                    (data['monitorsInGroup'] as JSONObject) || {}
+                ) as Dictionary<Array<ObjectID>>;
+
+            const incidentStates: Array<IncidentState> =
+                JSONFunctions.fromJSONArray(
+                    (data['incidentStates'] as JSONArray) || [],
+                    IncidentState
+                );
+
+            setMonitorsInGroup(monitorsInGroup);
+            setIncidentStates(incidentStates);
+
             // save data. set()
             setIncidentPublicNotes(incidentPublicNotes);
             setIncidents(incidents);
@@ -111,20 +143,16 @@ const Overview: FunctionComponent<PageComponentProps> = (
             props.onLoadComplete();
         } catch (err) {
             if (err instanceof HTTPErrorResponse) {
-                StatusPageUtil.checkIfTheUserIsAuthenticated(err);
+                await StatusPageUtil.checkIfTheUserIsAuthenticated(err);
             }
-            setError(BaseAPI.getFriendlyMessage(err));
+            setError(API.getFriendlyMessage(err));
             setIsLoading(false);
         }
     }, []);
 
-    useEffect(() => {
-        if (isLoading) {
-            // parse data;
-            setParsedData(null);
-            return;
-        }
-
+    const getEventHistoryListComponentProps: Function = (
+        incidents: Array<Incident>
+    ): EventHistoryListComponentProps => {
         const eventHistoryListComponentProps: EventHistoryListComponentProps = {
             items: [],
         };
@@ -149,6 +177,7 @@ const Overview: FunctionComponent<PageComponentProps> = (
                     incidentPublicNotes,
                     incidentStateTimelines,
                     statusPageResources,
+                    monitorsInGroup,
                     StatusPageUtil.isPreviewPage(),
                     true
                 )
@@ -161,7 +190,46 @@ const Overview: FunctionComponent<PageComponentProps> = (
             );
         }
 
-        setParsedData(eventHistoryListComponentProps);
+        return eventHistoryListComponentProps;
+    };
+
+    useEffect(() => {
+        if (isLoading) {
+            // parse data;
+            setParsedActiveIncidentsData(null);
+            setParsedResolvedIncidentsData(null);
+            return;
+        }
+
+        const resolvedIncidentStateOrder: number =
+            incidentStates.find((state: IncidentState) => {
+                return state.isResolvedState;
+            })?.order || 0;
+
+        const activeIncidents: Array<Incident> = incidents.filter(
+            (incident: Incident) => {
+                return (
+                    (incident.currentIncidentState?.order || 0) <
+                    resolvedIncidentStateOrder
+                );
+            }
+        );
+
+        const resolvedIncidents: Array<Incident> = incidents.filter(
+            (incident: Incident) => {
+                return !(
+                    (incident.currentIncidentState?.order || 0) <
+                    resolvedIncidentStateOrder
+                );
+            }
+        );
+
+        setParsedActiveIncidentsData(
+            getEventHistoryListComponentProps(activeIncidents)
+        );
+        setParsedResolvedIncidentsData(
+            getEventHistoryListComponentProps(resolvedIncidents)
+        );
     }, [isLoading]);
 
     if (isLoading) {
@@ -170,10 +238,6 @@ const Overview: FunctionComponent<PageComponentProps> = (
 
     if (error) {
         return <ErrorMessage error={error} />;
-    }
-
-    if (!parsedData) {
-        return <PageLoader isVisible={true} />;
     }
 
     return (
@@ -198,13 +262,34 @@ const Overview: FunctionComponent<PageComponentProps> = (
                 },
             ]}
         >
-            {incidents && incidents.length > 0 ? (
-                <EventHistoryList {...parsedData} />
+            {parsedActiveIncidentsData?.items &&
+            parsedActiveIncidentsData?.items.length > 0 ? (
+                <div>
+                    <Section title="Active Incidents" />
+
+                    <EventHistoryList
+                        items={parsedActiveIncidentsData?.items || []}
+                    />
+                </div>
+            ) : (
+                <></>
+            )}
+
+            {parsedResolvedIncidentsData?.items &&
+            parsedResolvedIncidentsData?.items.length > 0 ? (
+                <div>
+                    <Section title="Resolved Incidents" />
+
+                    <EventHistoryList
+                        items={parsedResolvedIncidentsData?.items || []}
+                    />
+                </div>
             ) : (
                 <></>
             )}
             {incidents.length === 0 ? (
                 <EmptyState
+                    id={'incidents-empty-state'}
                     title={'No Incident'}
                     description={'No incidents posted on this status page.'}
                     icon={IconProp.Alert}

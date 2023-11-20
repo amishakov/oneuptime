@@ -10,6 +10,7 @@ import FileService, {
 } from 'CommonServer/Services/FileService';
 import BaseAPI from 'CommonServer/API/BaseAPI';
 import FileAPI from './API/File';
+import { ClickhouseAppInstance } from 'CommonServer/Infrastructure/ClickhouseDatabase';
 
 const app: ExpressApplication = Express.getExpressApp();
 
@@ -23,7 +24,7 @@ app.use(
 // File Serve API.
 app.use(`/${APP_NAME.toLocaleLowerCase()}`, new FileAPI().router);
 
-const init: Function = async (): Promise<void> => {
+const init: () => Promise<void> = async (): Promise<void> => {
     try {
         // init the app
         await App(APP_NAME);
@@ -34,10 +35,19 @@ const init: Function = async (): Promise<void> => {
 
         // connect redis
         await Redis.connect();
+
+        await ClickhouseAppInstance.connect(
+            ClickhouseAppInstance.getDatasourceOptions()
+        );
     } catch (err) {
         logger.error('App Init Failed:');
         logger.error(err);
+        throw err;
     }
 };
 
-init();
+init().catch((err: Error) => {
+    logger.error(err);
+    logger.info('Exiting node process');
+    process.exit(1);
+});

@@ -15,6 +15,7 @@ import RunWorkflow from './Services/RunWorkflow';
 import { JSONObject } from 'Common/Types/JSON';
 import ObjectID from 'Common/Types/ObjectID';
 import WorkflowAPI from './API/Workflow';
+import { ClickhouseAppInstance } from 'CommonServer/Infrastructure/ClickhouseDatabase';
 
 const APP_NAME: string = 'workflow';
 
@@ -35,7 +36,7 @@ app.get(
     }
 );
 
-const init: Function = async (): Promise<void> => {
+const init: () => Promise<void> = async (): Promise<void> => {
     try {
         // connect to the database.
         await PostgresAppInstance.connect(
@@ -49,6 +50,10 @@ const init: Function = async (): Promise<void> => {
 
         // connect redis
         await Redis.connect();
+
+        await ClickhouseAppInstance.connect(
+            ClickhouseAppInstance.getDatasourceOptions()
+        );
 
         // Job process.
         QueueWorker.getWorker(
@@ -68,9 +73,14 @@ const init: Function = async (): Promise<void> => {
     } catch (err) {
         logger.error('App Init Failed:');
         logger.error(err);
+        throw err;
     }
 };
 
-init();
+init().catch((err: Error) => {
+    logger.error(err);
+    logger.info('Exiting node process');
+    process.exit(1);
+});
 
 export default app;

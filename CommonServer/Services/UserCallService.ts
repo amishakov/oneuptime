@@ -1,6 +1,8 @@
 import PostgresDatabase from '../Infrastructure/PostgresDatabase';
 import Model from 'Model/Models/UserCall';
-import DatabaseService, { OnCreate, OnDelete } from './DatabaseService';
+import DatabaseService from './DatabaseService';
+
+import { OnCreate, OnDelete } from '../Types/Database/Hooks';
 import CreateBy from '../Types/Database/CreateBy';
 import ProjectService from './ProjectService';
 import Project from 'Model/Models/Project';
@@ -13,6 +15,7 @@ import CallRequest from 'Common/Types/Call/CallRequest';
 import DeleteBy from '../Types/Database/DeleteBy';
 import LIMIT_MAX from 'Common/Types/Database/LimitMax';
 import UserNotificationRuleService from './UserNotificationRuleService';
+import { IsBillingEnabled } from '../EnvironmentConfig';
 
 export class Service extends DatabaseService<Model> {
     public constructor(postgresDatabase?: PostgresDatabase) {
@@ -85,7 +88,10 @@ export class Service extends DatabaseService<Model> {
             );
         }
 
-        if (project?.smsOrCallCurrentBalanceInUSDCents! <= 100) {
+        if (
+            (project.smsOrCallCurrentBalanceInUSDCents as number) <= 100 &&
+            IsBillingEnabled
+        ) {
             throw new BadDataException(
                 'Your SMS balance is low. Please recharge your SMS balance in Project Settings > Notification Settings.'
             );
@@ -114,6 +120,7 @@ export class Service extends DatabaseService<Model> {
                 phone: true,
                 verificationCode: true,
                 isVerified: true,
+                projectId: true,
             },
         });
 

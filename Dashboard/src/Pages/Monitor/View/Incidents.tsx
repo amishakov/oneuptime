@@ -15,7 +15,6 @@ import Color from 'Common/Types/Color';
 import Pill from 'CommonUI/src/Components/Pill/Pill';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
 import MonitorStatus from 'Model/Models/MonitorStatus';
-import IconProp from 'Common/Types/Icon/IconProp';
 import Incident from 'Model/Models/Incident';
 import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import JSONFunctions from 'Common/Types/JSONFunctions';
@@ -78,7 +77,6 @@ const MonitorIncidents: FunctionComponent<PageComponentProps> = (
                 }}
                 isViewable={true}
                 cardProps={{
-                    icon: IconProp.Alert,
                     title: 'Incidents',
                     description:
                         'Here is a list of incidents for this monitor.',
@@ -86,11 +84,14 @@ const MonitorIncidents: FunctionComponent<PageComponentProps> = (
                 createInitialValues={{
                     monitors: [modelId.toString()],
                 }}
-                onViewPage={(item: Incident) => {
-                    return new Route(
-                        `/dashboard/${
-                            DashboardNavigation.getProjectId()?.toString() || ''
-                        }/incidents/${item._id}`
+                onViewPage={(item: Incident): Promise<Route> => {
+                    return Promise.resolve(
+                        new Route(
+                            `/dashboard/${
+                                DashboardNavigation.getProjectId()?.toString() ||
+                                ''
+                            }/incidents/${item._id}`
+                        )
                     );
                 }}
                 noItemsMessage={'No incidents created for this monitor so far.'}

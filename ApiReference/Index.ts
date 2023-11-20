@@ -86,16 +86,21 @@ app.get('/*', (req: ExpressRequest, res: ExpressResponse) => {
     return PageNotFoundServiceHandler.executeResponse(req, res);
 });
 
-const init: Function = async (): Promise<void> => {
+const init: () => Promise<void> = async (): Promise<void> => {
     try {
         // init the app
         await App(APP_NAME);
     } catch (err) {
         logger.error('App Init Failed:');
         logger.error(err);
+        throw err;
     }
 };
 
-init();
+init().catch((err: Error) => {
+    logger.error(err);
+    logger.info('Exiting node process');
+    process.exit(1);
+});
 
 export default app;

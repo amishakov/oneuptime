@@ -22,14 +22,15 @@ import PostgresDatabase, {
 } from '../Infrastructure/PostgresDatabase';
 import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 import ObjectID from 'Common/Types/ObjectID';
-import SortOrder from 'Common/Types/Database/SortOrder';
-import { EncryptionSecret, WorkflowHostname, WorkflowRoute } from '../Config';
+import SortOrder from 'Common/Types/BaseDatabase/SortOrder';
+import { EncryptionSecret, WorkflowHostname } from '../EnvironmentConfig';
+import { WorkflowRoute } from 'Common/ServiceRoute';
 import HashedString from 'Common/Types/HashedString';
 import UpdateByID from '../Types/Database/UpdateByID';
 import Columns from 'Common/Types/Database/Columns';
 import FindOneByID from '../Types/Database/FindOneByID';
 import Dictionary from 'Common/Types/Dictionary';
-import DatabaseCommonInteractionProps from 'Common/Types/Database/DatabaseCommonInteractionProps';
+import DatabaseCommonInteractionProps from 'Common/Types/BaseDatabase/DatabaseCommonInteractionProps';
 import QueryHelper from '../Types/Database/QueryHelper';
 import { getUniqueColumnsBy } from 'Common/Types/Database/UniqueColumnBy';
 import Typeof from 'Common/Types/Typeof';
@@ -39,7 +40,7 @@ import LIMIT_MAX from 'Common/Types/Database/LimitMax';
 import { TableColumnMetadata } from 'Common/Types/Database/TableColumn';
 import ModelPermission, {
     CheckReadPermissionType,
-} from '../Utils/ModelPermission';
+} from '../Types/Database/ModelPermission';
 import Select from '../Types/Database/Select';
 import RelationSelect from '../Types/Database/RelationSelect';
 import UpdateByIDAndFetch from '../Types/Database/UpdateByIDAndFetch';
@@ -52,32 +53,17 @@ import Text from 'Common/Types/Text';
 import logger from '../Utils/Logger';
 import BaseService from './BaseService';
 import { getMaxLengthFromTableColumnType } from 'Common/Types/Database/ColumnLength';
-
-export type DatabaseTriggerType = 'on-create' | 'on-update' | 'on-delete';
-
-export interface OnCreate<TBaseModel extends BaseModel> {
-    createBy: CreateBy<TBaseModel>;
-    carryForward: any;
-}
-
-export interface OnFind<TBaseModel extends BaseModel> {
-    findBy: FindBy<TBaseModel>;
-    carryForward: any;
-}
-
-export interface OnDelete<TBaseModel extends BaseModel> {
-    deleteBy: DeleteBy<TBaseModel>;
-    carryForward: any;
-}
-
-export interface OnUpdate<TBaseModel extends BaseModel> {
-    updateBy: UpdateBy<TBaseModel>;
-    carryForward: any;
-}
+import {
+    DatabaseTriggerType,
+    OnCreate,
+    OnDelete,
+    OnFind,
+    OnUpdate,
+} from '../Types/Database/Hooks';
 
 class DatabaseService<TBaseModel extends BaseModel> extends BaseService {
     private postgresDatabase!: PostgresDatabase;
-    public entityType!: { new (): TBaseModel };
+    public modelType!: { new (): TBaseModel };
     private model!: TBaseModel;
     private modelName!: string;
 
@@ -104,7 +90,7 @@ class DatabaseService<TBaseModel extends BaseModel> extends BaseService {
         postgresDatabase?: PostgresDatabase
     ) {
         super();
-        this.entityType = modelType;
+        this.modelType = modelType;
         this.model = new modelType();
         this.modelName = modelType.name;
 
@@ -147,7 +133,7 @@ class DatabaseService<TBaseModel extends BaseModel> extends BaseService {
             : PostgresAppInstance.getDataSource();
 
         if (dataSource) {
-            return dataSource.getRepository<TBaseModel>(this.entityType.name);
+            return dataSource.getRepository<TBaseModel>(this.modelType.name);
         }
 
         throw new DatabaseNotConnectedException();
@@ -169,6 +155,40 @@ class DatabaseService<TBaseModel extends BaseModel> extends BaseService {
                 data.getTableColumnMetadata(column);
             if (metadata.forceGetDefaultValueOnCreate) {
                 (data as any)[column] = metadata.forceGetDefaultValueOnCreate();
+            }
+        }
+
+        return data;
+    }
+
+    protected async checkForUniqueValues(
+        data: TBaseModel
+    ): Promise<TBaseModel> {
+        const tableColumns: Array<string> = data.getTableColumns().columns;
+
+        for (const columnName of tableColumns) {
+            const metadata: TableColumnMetadata =
+                data.getTableColumnMetadata(columnName);
+            if (metadata.unique && data.getColumnValue(columnName)) {
+                // check for unique values.
+                const count: PositiveNumber = await this.countBy({
+                    query: {
+                        [columnName]: data.getColumnValue(columnName),
+                    } as any,
+                    props: {
+                        isRoot: true,
+                    },
+                });
+
+                if (count.toNumber() > 0) {
+                    throw new BadDataException(
+                        `${metadata.title} ${data
+                            .getColumnValue(columnName)
+                            ?.toString()} already exists. Please choose a different ${
+                            metadata.title
+                        }`
+                    );
+                }
             }
         }
 
@@ -579,7 +599,10 @@ class DatabaseService<TBaseModel extends BaseModel> extends BaseService {
         }
 
         data = this.generateDefaultValues(data);
+
         data = this.checkRequiredFields(data);
+
+        await this.checkForUniqueValues(data);
 
         if (!this.isValid(data)) {
             throw new BadDataException('Data is not valid');
@@ -596,7 +619,7 @@ class DatabaseService<TBaseModel extends BaseModel> extends BaseService {
         data = await this.hash(data);
 
         ModelPermission.checkCreatePermissions(
-            this.entityType,
+            this.modelType,
             data,
             _createdBy.props
         );
@@ -811,7 +834,7 @@ class DatabaseService<TBaseModel extends BaseModel> extends BaseService {
 
             const checkReadPermissionType: CheckReadPermissionType<TBaseModel> =
                 await ModelPermission.checkReadPermission(
-                    this.entityType,
+                    this.modelType,
                     query,
                     null,
                     props
@@ -867,7 +890,7 @@ class DatabaseService<TBaseModel extends BaseModel> extends BaseService {
             const beforeDeleteBy: DeleteBy<TBaseModel> = onDelete.deleteBy;
 
             beforeDeleteBy.query = await ModelPermission.checkDeletePermission(
-                this.entityType,
+                this.modelType,
                 beforeDeleteBy.query,
                 deleteBy.props
             );
@@ -920,19 +943,20 @@ class DatabaseService<TBaseModel extends BaseModel> extends BaseService {
 
     private async _deleteBy(deleteBy: DeleteBy<TBaseModel>): Promise<number> {
         try {
-            if (this.doNotAllowDelete) {
+            if (this.doNotAllowDelete && !deleteBy.props.isRoot) {
                 throw new BadDataException('Delete not allowed');
             }
 
             const onDelete: OnDelete<TBaseModel> = deleteBy.props.ignoreHooks
                 ? { deleteBy, carryForward: [] }
                 : await this.onBeforeDelete(deleteBy);
+
             const beforeDeleteBy: DeleteBy<TBaseModel> = onDelete.deleteBy;
 
             const carryForward: any = onDelete.carryForward;
 
             beforeDeleteBy.query = await ModelPermission.checkDeletePermission(
-                this.entityType,
+                this.modelType,
                 beforeDeleteBy.query,
                 deleteBy.props
             );
@@ -1086,7 +1110,7 @@ class DatabaseService<TBaseModel extends BaseModel> extends BaseService {
                 select: Select<TBaseModel> | null;
                 relationSelect: RelationSelect<TBaseModel> | null;
             } = await ModelPermission.checkReadPermission(
-                this.entityType,
+                this.modelType,
                 onBeforeFind.query,
                 onBeforeFind.select || null,
                 onBeforeFind.props
@@ -1250,7 +1274,7 @@ class DatabaseService<TBaseModel extends BaseModel> extends BaseService {
             const carryForward: any = onUpdate.carryForward;
 
             beforeUpdateBy.query = await ModelPermission.checkUpdatePermissions(
-                this.entityType,
+                this.modelType,
                 beforeUpdateBy.query,
                 beforeUpdateBy.data,
                 beforeUpdateBy.props

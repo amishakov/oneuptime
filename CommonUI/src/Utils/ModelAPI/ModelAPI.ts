@@ -17,8 +17,13 @@ import Dictionary from 'Common/Types/Dictionary';
 import ProjectUtil from '../Project';
 import Sort from './Sort';
 import Project from 'Model/Models/Project';
-import User from '../User';
 import Navigation from '../Navigation';
+
+export class ModelAPIHttpResponse<
+    TBaseModel extends BaseModel
+> extends HTTPResponse<TBaseModel> {
+    public miscData?: JSONObject | undefined;
+}
 
 export interface ListResult<TBaseModel extends BaseModel> extends JSONObject {
     data: Array<TBaseModel>;
@@ -112,9 +117,7 @@ export default class ModelAPI {
         formType: FormType,
         miscDataProps?: JSONObject,
         requestOptions?: RequestOptions | undefined
-    ): Promise<
-        HTTPResponse<JSONObject | JSONArray | TBaseModel | Array<TBaseModel>>
-    > {
+    ): Promise<ModelAPIHttpResponse<TBaseModel>> {
         let apiUrl: URL | null = requestOptions?.overrideRequestUrl || null;
 
         if (!apiUrl) {
@@ -135,32 +138,41 @@ export default class ModelAPI {
             apiUrl = apiUrl.addRoute(`/${model._id}`);
         }
 
-        const result: HTTPResponse<
-            JSONObject | JSONArray | TBaseModel | Array<TBaseModel>
-        > = await API.fetch<
-            JSONObject | JSONArray | TBaseModel | Array<TBaseModel>
-        >(
-            httpMethod,
-            apiUrl,
-            {
-                data: JSONFunctions.serialize(
-                    JSONFunctions.toJSON(model, modelType)
-                ),
-                miscDataProps: miscDataProps || {},
-            },
-            {
-                ...this.getCommonHeaders(requestOptions),
-                ...(requestOptions?.requestHeaders || {}),
-            }
-        );
+        const apiResult: HTTPErrorResponse | HTTPResponse<TBaseModel> =
+            await API.fetch<TBaseModel>(
+                httpMethod,
+                apiUrl,
+                {
+                    data: JSONFunctions.serialize(
+                        JSONFunctions.toJSON(model, modelType)
+                    ),
+                    miscDataProps: miscDataProps || {},
+                },
+                {
+                    ...this.getCommonHeaders(requestOptions),
+                    ...(requestOptions?.requestHeaders || {}),
+                }
+            );
 
-        if (result.isSuccess()) {
+        if (apiResult.isSuccess() && apiResult instanceof HTTPResponse) {
+            const result: ModelAPIHttpResponse<TBaseModel> =
+                apiResult as ModelAPIHttpResponse<TBaseModel>;
+
+            if ((result.data as any)['_miscData']) {
+                result.miscData = (result.data as any)[
+                    '_miscData'
+                ] as JSONObject;
+                delete (result.data as any)['_miscData'];
+            }
+
+            result.data = JSONFunctions.fromJSONObject(result.data, modelType);
+
             return result;
         }
 
-        this.checkStatusCode(result);
+        this.checkStatusCode(apiResult);
 
-        throw result;
+        throw apiResult;
     }
 
     public static async getList<TBaseModel extends BaseModel>(
@@ -306,7 +318,6 @@ export default class ModelAPI {
 
         headers = {
             ...headers,
-            ...User.getAllSsoTokens(),
         };
 
         if (requestOptions && requestOptions.isMultiTenantRequest) {
@@ -344,12 +355,21 @@ export default class ModelAPI {
             );
         }
 
+        return this.post<TBaseModel>(modelType, apiUrl, select, requestOptions);
+    }
+
+    public static async post<TBaseModel extends BaseModel>(
+        modelType: { new (): TBaseModel },
+        apiUrl: URL,
+        select?: Select<TBaseModel> | undefined,
+        requestOptions?: RequestOptions | undefined
+    ): Promise<TBaseModel | null> {
         const result: HTTPResponse<TBaseModel> | HTTPErrorResponse =
             await API.fetch<TBaseModel>(
                 HTTPMethod.POST,
                 apiUrl,
                 {
-                    select: JSONFunctions.serialize(select as JSONObject),
+                    select: JSONFunctions.serialize(select as JSONObject) || {},
                 },
                 this.getCommonHeaders(requestOptions)
             );

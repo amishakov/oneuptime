@@ -5,6 +5,7 @@ import logger from 'CommonServer/Utils/Logger';
 import BaseAPI from 'CommonServer/API/BaseAPI';
 import App from 'CommonServer/Utils/StartServer';
 import { PostgresAppInstance } from 'CommonServer/Infrastructure/PostgresDatabase';
+import { ClickhouseAppInstance } from 'CommonServer/Infrastructure/ClickhouseDatabase';
 
 import User from 'Model/Models/User';
 import UserService, {
@@ -15,10 +16,9 @@ import BillingPaymentMethodAPI from 'CommonServer/API/BillingPaymentMethodAPI';
 
 import BillingInvoiceAPI from 'CommonServer/API/BillingInvoiceAPI';
 
-import Project from 'Model/Models/Project';
-import ProjectService, {
-    Service as ProjectServiceType,
-} from 'CommonServer/Services/ProjectService';
+import ProjectAPI from 'CommonServer/API/ProjectAPI';
+
+import GlobalConfigAPI from 'CommonServer/API/GlobalConfigAPI';
 
 import ShortLink from 'Model/Models/ShortLink';
 import ShortLinkService, {
@@ -29,6 +29,31 @@ import IncidentOwnerTeam from 'Model/Models/IncidentOwnerTeam';
 import IncidentOwnerTeamService, {
     Service as IncidentOwnerTeamServiceType,
 } from 'CommonServer/Services/IncidentOwnerTeamService';
+
+import IncidentTemplate from 'Model/Models/IncidentTemplate';
+import IncidentTemplateService, {
+    Service as IncidentTemplateServiceType,
+} from 'CommonServer/Services/IncidentTemplateService';
+
+import IncidentNoteTemplate from 'Model/Models/IncidentNoteTemplate';
+import IncidentNoteTemplateService, {
+    Service as IncidentNoteTemplateServiceType,
+} from 'CommonServer/Services/IncidentNoteTemplateService';
+
+import ScheduledMaintenanceNoteTemplate from 'Model/Models/ScheduledMaintenanceNoteTemplate';
+import ScheduledMaintenanceNoteTemplateService, {
+    Service as ScheduledMaintenanceNoteTemplateServiceType,
+} from 'CommonServer/Services/ScheduledMaintenanceNoteTemplateService';
+
+import IncidentTemplateOwnerTeam from 'Model/Models/IncidentTemplateOwnerTeam';
+import IncidentTemplateOwnerTeamService, {
+    Service as IncidentTemplateOwnerTeamServiceType,
+} from 'CommonServer/Services/IncidentTemplateOwnerTeamService';
+
+import IncidentTemplateOwnerUser from 'Model/Models/IncidentTemplateOwnerUser';
+import IncidentTemplateOwnerUserService, {
+    Service as IncidentTemplateOwnerUserServiceType,
+} from 'CommonServer/Services/IncidentTemplateOwnerUserService';
 
 import MonitorOwnerTeam from 'Model/Models/MonitorOwnerTeam';
 import MonitorOwnerTeamService, {
@@ -75,10 +100,7 @@ import WorkflowLogService, {
     Service as WorkflowLogServiceType,
 } from 'CommonServer/Services/WorkflowLogService';
 
-import ProjectSSO from 'Model/Models/ProjectSso';
-import ProjectSSOService, {
-    Service as ProjectSSOServiceType,
-} from 'CommonServer/Services/ProjectSsoService';
+import ProjectSsoAPI from 'CommonServer/API/ProjectSSO';
 
 import SmsLog from 'Model/Models/SmsLog';
 import SmsLogService, {
@@ -89,6 +111,11 @@ import EmailLog from 'Model/Models/EmailLog';
 import EmailLogService, {
     Service as EmailLogServiceType,
 } from 'CommonServer/Services/EmailLogService';
+
+import Reseller from 'Model/Models/Reseller';
+import ResellerService, {
+    Service as ResellerServiceType,
+} from 'CommonServer/Services/ResellerService';
 
 import CallLog from 'Model/Models/CallLog';
 import CallLogService, {
@@ -104,6 +131,11 @@ import WorkflowVariable from 'Model/Models/WorkflowVariable';
 import WorkflowVariableService, {
     Service as WorkflowVariableServiceType,
 } from 'CommonServer/Services/WorkflowVariableService';
+
+import Service from 'Model/Models/Service';
+import ServiceService, {
+    Service as ServiceServiceType,
+} from 'CommonServer/Services/ServiceService';
 
 import MonitorProbe from 'Model/Models/MonitorProbe';
 import MonitorProbeService, {
@@ -276,11 +308,12 @@ import UserSMSAPI from 'CommonServer/API/UserSmsAPI';
 import UserCallAPI from 'CommonServer/API/UserCallAPI';
 
 // Import API
-
+import ResellerPlanAPI from 'CommonServer/API/ResellerPlanAPI';
 import StatusPageAPI from 'CommonServer/API/StatusPageAPI';
 import NotificationAPI from 'CommonServer/API/NotificationAPI';
+import MonitorGroupAPI from 'CommonServer/API/MonitorGroupAPI';
 
-import ProbeAPI from 'CommonServer/API/ProbeAPI';
+import Ingestor from 'CommonServer/API/ProbeAPI';
 
 import StatusPageSubscriberAPI from 'CommonServer/API/StatusPageSubscriberAPI';
 
@@ -315,6 +348,11 @@ import OnCallDutyPolicyExecutionLogService, {
     Service as OnCallDutyPolicyExecutionLogServiceType,
 } from 'CommonServer/Services/OnCallDutyPolicyExecutionLogService';
 
+import PromoCode from 'Model/Models/PromoCode';
+import PromoCodeService, {
+    Service as PromoCodeServiceType,
+} from 'CommonServer/Services/PromoCodeService';
+
 import OnCallDutyPolicyEscalationRule from 'Model/Models/OnCallDutyPolicyEscalationRule';
 import OnCallDutyPolicyEscalationRuleService, {
     Service as OnCallDutyPolicyEscalationRuleServiceType,
@@ -347,6 +385,21 @@ import UserNotificationSettingService, {
     Service as UserNotificationSettingServiceType,
 } from 'CommonServer/Services/UserNotificationSettingService';
 
+import MonitorGroupOwnerUser from 'Model/Models/MonitorGroupOwnerUser';
+import MonitorGroupOwnerUserService, {
+    Service as MonitorGroupOwnerUserServiceType,
+} from 'CommonServer/Services/MonitorGroupOwnerUserService';
+
+import MonitorGroupOwnerTeam from 'Model/Models/MonitorGroupOwnerTeam';
+import MonitorGroupOwnerTeamService, {
+    Service as MonitorGroupOwnerTeamServiceType,
+} from 'CommonServer/Services/MonitorGroupOwnerTeamService';
+
+import MonitorGroupResource from 'Model/Models/MonitorGroupResource';
+import MonitorGroupResourceService, {
+    Service as MonitorGroupResourceServiceType,
+} from 'CommonServer/Services/MonitorGroupResourceService';
+
 const app: ExpressApplication = Express.getExpressApp();
 
 const APP_NAME: string = 'api';
@@ -355,13 +408,6 @@ const APP_NAME: string = 'api';
 app.use(
     `/${APP_NAME.toLocaleLowerCase()}`,
     new BaseAPI<User, UserServiceType>(User, UserService).getRouter()
-);
-app.use(
-    `/${APP_NAME.toLocaleLowerCase()}`,
-    new BaseAPI<Project, ProjectServiceType>(
-        Project,
-        ProjectService
-    ).getRouter()
 );
 
 app.use(
@@ -391,6 +437,30 @@ app.use(
 app.use(
     `/${APP_NAME.toLocaleLowerCase()}`,
     new BaseAPI<Team, TeamServiceType>(Team, TeamService).getRouter()
+);
+
+app.use(
+    `/${APP_NAME.toLocaleLowerCase()}`,
+    new BaseAPI<MonitorGroupOwnerUser, MonitorGroupOwnerUserServiceType>(
+        MonitorGroupOwnerUser,
+        MonitorGroupOwnerUserService
+    ).getRouter()
+);
+
+app.use(
+    `/${APP_NAME.toLocaleLowerCase()}`,
+    new BaseAPI<MonitorGroupOwnerTeam, MonitorGroupOwnerTeamServiceType>(
+        MonitorGroupOwnerTeam,
+        MonitorGroupOwnerTeamService
+    ).getRouter()
+);
+
+app.use(
+    `/${APP_NAME.toLocaleLowerCase()}`,
+    new BaseAPI<MonitorGroupResource, MonitorGroupResourceServiceType>(
+        MonitorGroupResource,
+        MonitorGroupResourceService
+    ).getRouter()
 );
 
 app.use(
@@ -446,6 +516,14 @@ app.use(
     new BaseAPI<Workflow, WorkflowServiceType>(
         Workflow,
         WorkflowService
+    ).getRouter()
+);
+
+app.use(
+    `/${APP_NAME.toLocaleLowerCase()}`,
+    new BaseAPI<Service, ServiceServiceType>(
+        Service,
+        ServiceService
     ).getRouter()
 );
 
@@ -603,6 +681,49 @@ app.use(
 
 app.use(
     `/${APP_NAME.toLocaleLowerCase()}`,
+    new BaseAPI<IncidentTemplate, IncidentTemplateServiceType>(
+        IncidentTemplate,
+        IncidentTemplateService
+    ).getRouter()
+);
+
+app.use(
+    `/${APP_NAME.toLocaleLowerCase()}`,
+    new BaseAPI<IncidentNoteTemplate, IncidentNoteTemplateServiceType>(
+        IncidentNoteTemplate,
+        IncidentNoteTemplateService
+    ).getRouter()
+);
+
+app.use(
+    `/${APP_NAME.toLocaleLowerCase()}`,
+    new BaseAPI<
+        ScheduledMaintenanceNoteTemplate,
+        ScheduledMaintenanceNoteTemplateServiceType
+    >(
+        ScheduledMaintenanceNoteTemplate,
+        ScheduledMaintenanceNoteTemplateService
+    ).getRouter()
+);
+
+app.use(
+    `/${APP_NAME.toLocaleLowerCase()}`,
+    new BaseAPI<
+        IncidentTemplateOwnerTeam,
+        IncidentTemplateOwnerTeamServiceType
+    >(IncidentTemplateOwnerTeam, IncidentTemplateOwnerTeamService).getRouter()
+);
+
+app.use(
+    `/${APP_NAME.toLocaleLowerCase()}`,
+    new BaseAPI<
+        IncidentTemplateOwnerUser,
+        IncidentTemplateOwnerUserServiceType
+    >(IncidentTemplateOwnerUser, IncidentTemplateOwnerUserService).getRouter()
+);
+
+app.use(
+    `/${APP_NAME.toLocaleLowerCase()}`,
     new BaseAPI<MonitorOwnerUser, MonitorOwnerUserServiceType>(
         MonitorOwnerUser,
         MonitorOwnerUserService
@@ -713,14 +834,6 @@ app.use(
 
 app.use(
     `/${APP_NAME.toLocaleLowerCase()}`,
-    new BaseAPI<ProjectSSO, ProjectSSOServiceType>(
-        ProjectSSO,
-        ProjectSSOService
-    ).getRouter()
-);
-
-app.use(
-    `/${APP_NAME.toLocaleLowerCase()}`,
     new BaseAPI<SmsLog, SmsLogServiceType>(SmsLog, SmsLogService).getRouter()
 );
 
@@ -729,6 +842,14 @@ app.use(
     new BaseAPI<EmailLog, EmailLogServiceType>(
         EmailLog,
         EmailLogService
+    ).getRouter()
+);
+
+app.use(
+    `/${APP_NAME.toLocaleLowerCase()}`,
+    new BaseAPI<Reseller, ResellerServiceType>(
+        Reseller,
+        ResellerService
     ).getRouter()
 );
 
@@ -757,6 +878,11 @@ app.use(
 );
 
 app.use(`/${APP_NAME.toLocaleLowerCase()}`, new StatusPageAPI().getRouter());
+app.use(`/${APP_NAME.toLocaleLowerCase()}`, new MonitorGroupAPI().getRouter());
+app.use(`/${APP_NAME.toLocaleLowerCase()}`, new ProjectSsoAPI().getRouter());
+app.use(`/${APP_NAME.toLocaleLowerCase()}`, new ResellerPlanAPI().getRouter());
+app.use(`/${APP_NAME.toLocaleLowerCase()}`, new GlobalConfigAPI().getRouter());
+
 app.use(
     `/${APP_NAME.toLocaleLowerCase()}`,
     new UserNotificationLogTimelineAPI().getRouter()
@@ -764,16 +890,20 @@ app.use(
 app.use(`/${APP_NAME.toLocaleLowerCase()}`, new UserCallAPI().getRouter());
 app.use(`/${APP_NAME.toLocaleLowerCase()}`, new UserEmailAPI().getRouter());
 app.use(`/${APP_NAME.toLocaleLowerCase()}`, new UserSMSAPI().getRouter());
-app.use(`/${APP_NAME.toLocaleLowerCase()}`, new ProbeAPI().getRouter());
+app.use(`/${APP_NAME.toLocaleLowerCase()}`, new Ingestor().getRouter());
 
 app.use(
     `/${APP_NAME.toLocaleLowerCase()}`,
     new StatusPageSubscriberAPI().getRouter()
 );
+
 app.use(
     `/${APP_NAME.toLocaleLowerCase()}`,
     new BillingPaymentMethodAPI().getRouter()
 );
+
+app.use(`/${APP_NAME.toLocaleLowerCase()}`, new ProjectAPI().getRouter());
+
 app.use(
     `/${APP_NAME.toLocaleLowerCase()}`,
     new BillingInvoiceAPI().getRouter()
@@ -871,6 +1001,14 @@ app.use(
 
 app.use(
     `/${APP_NAME.toLocaleLowerCase()}`,
+    new BaseAPI<PromoCode, PromoCodeServiceType>(
+        PromoCode,
+        PromoCodeService
+    ).getRouter()
+);
+
+app.use(
+    `/${APP_NAME.toLocaleLowerCase()}`,
     new BaseAPI<
         OnCallDutyPolicyExecutionLogTimeline,
         OnCallDutyPolicyExecutionLogTimelineServiceType
@@ -917,10 +1055,11 @@ app.use(
 
 app.use(`/${APP_NAME.toLocaleLowerCase()}`, NotificationAPI);
 
-const init: Function = async (): Promise<void> => {
+const init: () => Promise<void> = async (): Promise<void> => {
     try {
         // init the app
         await App(APP_NAME);
+
         // connect to the database.
         await PostgresAppInstance.connect(
             PostgresAppInstance.getDatasourceOptions()
@@ -928,10 +1067,19 @@ const init: Function = async (): Promise<void> => {
 
         // connect redis
         await Redis.connect();
+
+        await ClickhouseAppInstance.connect(
+            ClickhouseAppInstance.getDatasourceOptions()
+        );
     } catch (err) {
         logger.error('App Init Failed:');
         logger.error(err);
+        throw err;
     }
 };
 
-init();
+init().catch((err: Error) => {
+    logger.error(err);
+    logger.info('Exiting node process');
+    process.exit(1);
+});

@@ -9,7 +9,6 @@ import DashboardNavigation from '../../Utils/Navigation';
 import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import User from 'CommonUI/src/Utils/User';
 import UserNotificationSetting from 'Model/Models/UserNotificationSetting';
-import IconProp from 'Common/Types/Icon/IconProp';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import NotificationSettingEventType from 'Common/Types/NotificationSetting/NotificationSettingEventType';
@@ -33,10 +32,10 @@ const Settings: FunctionComponent<PageComponentProps> = (
                 }}
                 onBeforeCreate={(
                     model: UserNotificationSetting
-                ): UserNotificationSetting => {
+                ): Promise<UserNotificationSetting> => {
                     model.projectId = DashboardNavigation.getProjectId()!;
                     model.userId = User.getUserId();
-                    return model;
+                    return Promise.resolve(model);
                 }}
                 createVerb={'Add'}
                 id="notification-settings"
@@ -45,7 +44,6 @@ const Settings: FunctionComponent<PageComponentProps> = (
                 isEditable={true}
                 isCreateable={true}
                 cardProps={{
-                    icon: IconProp.AdjustmentVertical,
                     title: options.title,
                     description: options.description,
                 }}

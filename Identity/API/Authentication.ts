@@ -1,11 +1,8 @@
 import {
-    DisableSignup,
-    HttpProtocol,
     IsBillingEnabled,
     EncryptionSecret,
-    Domain,
-    AccountsRoute,
-} from 'CommonServer/Config';
+} from 'CommonServer/EnvironmentConfig';
+import { AccountsRoute } from 'Common/ServiceRoute';
 import Express, {
     ExpressRequest,
     ExpressResponse,
@@ -35,6 +32,10 @@ import Email from 'Common/Types/Email';
 import Name from 'Common/Types/Name';
 import AuthenticationEmail from '../Utils/AuthenticationEmail';
 import AccessTokenService from 'CommonServer/Services/AccessTokenService';
+import Hostname from 'Common/Types/API/Hostname';
+import Protocol from 'Common/Types/API/Protocol';
+import DatabaseConfig from 'CommonServer/DatabaseConfig';
+import CookieUtil from 'CommonServer/Utils/Cookie';
 
 const router: ExpressRouter = Express.getRouter();
 
@@ -46,11 +47,13 @@ router.post(
         next: NextFunction
     ): Promise<void> => {
         try {
-            if (DisableSignup) {
+            if (await DatabaseConfig.shouldDisableSignup()) {
                 return Response.sendErrorResponse(
                     req,
                     res,
-                    new BadRequestException('Sign up is disabled.')
+                    new BadRequestException(
+                        'Sign up is disabled on this OneUptime Server. Please contact your server admin to enable it.'
+                    )
                 );
             }
 
@@ -63,6 +66,20 @@ router.post(
                 //ALERT: Delete data.role so user don't accidently sign up as master-admin from the API.
                 partialUser.isMasterAdmin = false;
                 partialUser.isEmailVerified = false;
+            } else {
+                // IF its not a saas service then we will make the email verified.
+
+                // check if there are more than one user and if there is then we will not make the user master admin.
+
+                const userCount: PositiveNumber = await UserService.countBy({
+                    props: {
+                        isRoot: true,
+                    },
+                    query: {},
+                });
+
+                partialUser.isMasterAdmin = userCount.isZero(); // if the user count is 0 then make the first user master admin.
+                partialUser.isEmailVerified = true;
             }
 
             const alreadySavedUser: User | null = await UserService.findOneBy({
@@ -121,8 +138,8 @@ router.post(
 
             const emailVerificationToken: EmailVerificationToken =
                 new EmailVerificationToken();
-            emailVerificationToken.userId = savedUser?.id!;
-            emailVerificationToken.email = savedUser?.email!;
+            emailVerificationToken.userId = savedUser?.id as ObjectID;
+            emailVerificationToken.email = savedUser?.email as Email;
             emailVerificationToken.token = generatedToken;
             emailVerificationToken.expires = OneUptimeDate.getOneDayAfter();
 
@@ -133,6 +150,10 @@ router.post(
                 },
             });
 
+            const host: Hostname = await DatabaseConfig.getHost();
+            const httpProtocol: Protocol =
+                await DatabaseConfig.getHttpProtocol();
+
             MailService.sendMail({
                 toEmail: partialUser.email as Email,
                 subject: 'Welcome to OneUptime. Please verify your email.',
@@ -140,13 +161,13 @@ router.post(
                 vars: {
                     name: (partialUser.name! as Name).toString(),
                     tokenVerifyUrl: new URL(
-                        HttpProtocol,
-                        Domain,
+                        httpProtocol,
+                        host,
                         new Route(AccountsRoute.toString()).addRoute(
                             '/verify-email/' + generatedToken.toString()
                         )
                     ).toString(),
-                    homeUrl: new URL(HttpProtocol, Domain).toString(),
+                    homeUrl: new URL(httpProtocol, host).toString(),
                 },
             }).catch((err: Error) => {
                 logger.error(err);
@@ -163,10 +184,15 @@ router.post(
                     OneUptimeDate.getSecondsInDays(new PositiveNumber(30))
                 );
 
-                return Response.sendJsonObjectResponse(req, res, {
-                    token: token,
-                    user: JSONFunctions.toJSON(savedUser, User),
+                // Set a cookie with token.
+                CookieUtil.setCookie(res, CookieUtil.getUserTokenKey(), token, {
+                    maxAge: OneUptimeDate.getMillisecondsInDays(
+                        new PositiveNumber(30)
+                    ),
+                    httpOnly: true,
                 });
+
+                return Response.sendEntityResponse(req, res, savedUser, User);
             }
 
             return Response.sendErrorResponse(
@@ -209,7 +235,7 @@ router.post(
                 },
             });
 
-            if (alreadySavedUser) {
+            if (alreadySavedUser && alreadySavedUser.password) {
                 const token: string = ObjectID.generate().toString();
                 await UserService.updateOneBy({
                     query: {
@@ -224,15 +250,19 @@ router.post(
                     },
                 });
 
+                const host: Hostname = await DatabaseConfig.getHost();
+                const httpProtocol: Protocol =
+                    await DatabaseConfig.getHttpProtocol();
+
                 MailService.sendMail({
                     toEmail: user.email!,
                     subject: 'Password Reset Request for OneUptime',
                     templateType: EmailTemplateType.ForgotPassword,
                     vars: {
-                        homeURL: new URL(HttpProtocol, Domain).toString(),
+                        homeURL: new URL(httpProtocol, host).toString(),
                         tokenVerifyUrl: new URL(
-                            HttpProtocol,
-                            Domain,
+                            httpProtocol,
+                            host,
                             new Route(AccountsRoute.toString()).addRoute(
                                 '/reset-password/' + token
                             )
@@ -249,7 +279,7 @@ router.post(
                 req,
                 res,
                 new BadDataException(
-                    `No user is registered with ${user.email?.toString()}`
+                    `No user is registered with ${user.email?.toString()}. Please sign up for a new account.`
                 )
             );
         } catch (err) {
@@ -342,12 +372,16 @@ router.post(
                 },
             });
 
+            const host: Hostname = await DatabaseConfig.getHost();
+            const httpProtocol: Protocol =
+                await DatabaseConfig.getHttpProtocol();
+
             MailService.sendMail({
                 toEmail: user.email!,
                 subject: 'Email Verified.',
                 templateType: EmailTemplateType.EmailVerified,
                 vars: {
-                    homeURL: new URL(HttpProtocol, Domain).toString(),
+                    homeURL: new URL(httpProtocol, host).toString(),
                 },
             }).catch((err: Error) => {
                 logger.error(err);
@@ -430,16 +464,37 @@ router.post(
                 },
             });
 
+            const host: Hostname = await DatabaseConfig.getHost();
+            const httpProtocol: Protocol =
+                await DatabaseConfig.getHttpProtocol();
+
             MailService.sendMail({
                 toEmail: alreadySavedUser.email!,
                 subject: 'Password Changed.',
                 templateType: EmailTemplateType.PasswordChanged,
                 vars: {
-                    homeURL: new URL(HttpProtocol, Domain).toString(),
+                    homeURL: new URL(httpProtocol, host).toString(),
                 },
             }).catch((err: Error) => {
                 logger.error(err);
             });
+
+            return Response.sendEmptyResponse(req, res);
+        } catch (err) {
+            return next(err);
+        }
+    }
+);
+
+router.post(
+    '/logout',
+    async (
+        req: ExpressRequest,
+        res: ExpressResponse,
+        next: NextFunction
+    ): Promise<void> => {
+        try {
+            CookieUtil.removeAllCookies(req, res);
 
             return Response.sendEmptyResponse(req, res);
         } catch (err) {
@@ -520,10 +575,25 @@ router.post(
                         OneUptimeDate.getSecondsInDays(new PositiveNumber(30))
                     );
 
-                    return Response.sendJsonObjectResponse(req, res, {
-                        token: token,
-                        user: JSONFunctions.toJSON(alreadySavedUser, User),
-                    });
+                    // Set a cookie with token.
+                    CookieUtil.setCookie(
+                        res,
+                        CookieUtil.getUserTokenKey(),
+                        token,
+                        {
+                            maxAge: OneUptimeDate.getMillisecondsInDays(
+                                new PositiveNumber(30)
+                            ),
+                            httpOnly: true,
+                        }
+                    );
+
+                    return Response.sendEntityResponse(
+                        req,
+                        res,
+                        alreadySavedUser,
+                        User
+                    );
                 }
             }
             return Response.sendErrorResponse(

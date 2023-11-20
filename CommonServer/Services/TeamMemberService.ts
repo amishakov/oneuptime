@@ -1,9 +1,6 @@
 import PostgresDatabase from '../Infrastructure/PostgresDatabase';
-import DatabaseService, {
-    OnCreate,
-    OnDelete,
-    OnUpdate,
-} from './DatabaseService';
+import DatabaseService from './DatabaseService';
+import { OnCreate, OnDelete, OnUpdate } from '../Types/Database/Hooks';
 import CreateBy from '../Types/Database/CreateBy';
 import AccessTokenService from './AccessTokenService';
 import Email from 'Common/Types/Email';
@@ -15,12 +12,9 @@ import ObjectID from 'Common/Types/ObjectID';
 import QueryHelper from '../Types/Database/QueryHelper';
 import LIMIT_MAX from 'Common/Types/Database/LimitMax';
 import ProjectService from './ProjectService';
-import {
-    DashboardRoute,
-    Domain,
-    HttpProtocol,
-    IsBillingEnabled,
-} from '../Config';
+import { IsBillingEnabled } from '../EnvironmentConfig';
+import { AccountsRoute } from 'Common/ServiceRoute';
+import DatabaseConfig from '../DatabaseConfig';
 import BillingService from './BillingService';
 import SubscriptionPlan from 'Common/Types/Billing/SubscriptionPlan';
 import Project from 'Model/Models/Project';
@@ -33,6 +27,8 @@ import PositiveNumber from 'Common/Types/PositiveNumber';
 import TeamMember from 'Model/Models/TeamMember';
 import UserNotificationRuleService from './UserNotificationRuleService';
 import UserNotificationSettingService from './UserNotificationSettingService';
+import Hostname from 'Common/Types/API/Hostname';
+import Protocol from 'Common/Types/API/Protocol';
 
 export class TeamMemberService extends DatabaseService<TeamMember> {
     public constructor(postgresDatabase?: PostgresDatabase) {
@@ -79,7 +75,10 @@ export class TeamMemberService extends DatabaseService<TeamMember> {
                 isRoot: true,
             });
 
+            let isNewUser: boolean = false;
+
             if (!user) {
+                isNewUser = true;
                 user = await UserService.createByEmail(email, {
                     isRoot: true,
                 });
@@ -98,18 +97,35 @@ export class TeamMemberService extends DatabaseService<TeamMember> {
             });
 
             if (project) {
+                const host: Hostname = await DatabaseConfig.getHost();
+                const httpProtocol: Protocol =
+                    await DatabaseConfig.getHttpProtocol();
+
                 MailService.sendMail(
                     {
                         toEmail: email,
                         templateType: EmailTemplateType.InviteMember,
                         vars: {
-                            dashboardUrl: new URL(
-                                HttpProtocol,
-                                Domain,
-                                DashboardRoute
+                            signInLink: URL.fromString(
+                                new URL(
+                                    httpProtocol,
+                                    host,
+                                    AccountsRoute
+                                ).toString()
                             ).toString(),
+                            registerLink: URL.fromString(
+                                new URL(
+                                    httpProtocol,
+                                    host,
+                                    AccountsRoute
+                                ).toString()
+                            )
+                                .addRoute('/register')
+                                .addQueryParam('email', email.toString(), true)
+                                .toString(),
+                            isNewUser: isNewUser.toString(),
                             projectName: project.name!,
-                            homeUrl: new URL(HttpProtocol, Domain).toString(),
+                            homeUrl: new URL(httpProtocol, host).toString(),
                         },
                         subject: 'You have been invited to ' + project.name,
                     },
@@ -214,7 +230,7 @@ export class TeamMemberService extends DatabaseService<TeamMember> {
                 await UserNotificationRuleService.addDefaultNotificationRuleForUser(
                     item.projectId!,
                     item.userId!,
-                    item.user?.email!
+                    item.user?.email as Email
                 );
             }
         }
@@ -403,7 +419,7 @@ export class TeamMemberService extends DatabaseService<TeamMember> {
         ) {
             const plan: SubscriptionPlan | undefined =
                 SubscriptionPlan.getSubscriptionPlanById(
-                    project?.paymentProviderPlanId!
+                    project?.paymentProviderPlanId
                 );
 
             if (!plan) {

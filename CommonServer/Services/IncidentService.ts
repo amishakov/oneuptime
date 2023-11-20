@@ -1,10 +1,11 @@
 import PostgresDatabase from '../Infrastructure/PostgresDatabase';
 import Model from 'Model/Models/Incident';
-import DatabaseService, { OnCreate, OnUpdate } from './DatabaseService';
+import DatabaseService from './DatabaseService';
+import { OnCreate, OnDelete, OnUpdate } from '../Types/Database/Hooks';
 import ObjectID from 'Common/Types/ObjectID';
 import Monitor from 'Model/Models/Monitor';
 import MonitorService from './MonitorService';
-import DatabaseCommonInteractionProps from 'Common/Types/Database/DatabaseCommonInteractionProps';
+import DatabaseCommonInteractionProps from 'Common/Types/BaseDatabase/DatabaseCommonInteractionProps';
 import IncidentStateTimeline from 'Model/Models/IncidentStateTimeline';
 import IncidentStateTimelineService from './IncidentStateTimelineService';
 import CreateBy from '../Types/Database/CreateBy';
@@ -16,16 +17,23 @@ import IncidentOwnerTeam from 'Model/Models/IncidentOwnerTeam';
 import IncidentOwnerUser from 'Model/Models/IncidentOwnerUser';
 import IncidentOwnerUserService from './IncidentOwnerUserService';
 import Typeof from 'Common/Types/Typeof';
-import { DashboardUrl } from '../Config';
 import URL from 'Common/Types/API/URL';
 import User from 'Model/Models/User';
 import TeamMemberService from './TeamMemberService';
-import { LIMIT_PER_PROJECT } from 'Common/Types/Database/LimitMax';
+import LIMIT_MAX, { LIMIT_PER_PROJECT } from 'Common/Types/Database/LimitMax';
 import UserService from './UserService';
 import { JSONObject } from 'Common/Types/JSON';
 import OnCallDutyPolicyService from './OnCallDutyPolicyService';
 import UserNotificationEventType from 'Common/Types/UserNotification/UserNotificationEventType';
-import SortOrder from 'Common/Types/Database/SortOrder';
+import SortOrder from 'Common/Types/BaseDatabase/SortOrder';
+import DatabaseConfig from '../DatabaseConfig';
+import MonitorStatus from 'Model/Models/MonitorStatus';
+import MonitorStatusService from './MonitorStatusService';
+import PositiveNumber from 'Common/Types/PositiveNumber';
+import QueryHelper from '../Types/Database/QueryHelper';
+import MonitorStatusTimeline from 'Model/Models/MonitorStatusTimeline';
+import MonitorStatusTimelineService from './MonitorStatusTimelineService';
+import DeleteBy from '../Types/Database/DeleteBy';
 
 export class Service extends DatabaseService<Model> {
     public constructor(postgresDatabase?: PostgresDatabase) {
@@ -135,7 +143,7 @@ export class Service extends DatabaseService<Model> {
 
             const user: User | null = await UserService.findOneBy({
                 query: {
-                    _id: userId?.toString()!,
+                    _id: userId?.toString() as string,
                 },
                 select: {
                     _id: true,
@@ -236,6 +244,24 @@ export class Service extends DatabaseService<Model> {
                             UserNotificationEventType.IncidentCreated,
                     }
                 );
+            }
+        }
+
+        // check if the incident is created manaull by a user and if thats the case, then disable active monitoting on that monitor.
+
+        if (!createdItem.isCreatedAutomatically) {
+            const monitors: Array<Monitor> = createdItem.monitors || [];
+
+            for (const monitor of monitors) {
+                await MonitorService.updateOneById({
+                    id: monitor.id!,
+                    data: {
+                        disableActiveMonitoringBecauseOfManualIncident: true,
+                    },
+                    props: {
+                        isRoot: true,
+                    },
+                });
             }
         }
 
@@ -355,11 +381,13 @@ export class Service extends DatabaseService<Model> {
         }
     }
 
-    public getIncidentLinkInDashboard(
+    public async getIncidentLinkInDashboard(
         projectId: ObjectID,
         incidentId: ObjectID
-    ): URL {
-        return URL.fromString(DashboardUrl.toString()).addRoute(
+    ): Promise<URL> {
+        const dashboardUrl: URL = await DatabaseConfig.getDashboardUrl();
+
+        return URL.fromString(dashboardUrl.toString()).addRoute(
             `/${projectId.toString()}/incidents/${incidentId.toString()}`
         );
     }
@@ -389,6 +417,177 @@ export class Service extends DatabaseService<Model> {
         }
 
         return onUpdate;
+    }
+
+    public async doesMonitorHasMoreActiveManualIncidents(
+        monitorId: ObjectID,
+        proojectId: ObjectID
+    ): Promise<boolean> {
+        const resolvedState: IncidentState | null =
+            await IncidentStateService.findOneBy({
+                query: {
+                    projectId: proojectId,
+                    isResolvedState: true,
+                },
+                props: {
+                    isRoot: true,
+                },
+                select: {
+                    _id: true,
+                    order: true,
+                },
+            });
+
+        const incidentCount: PositiveNumber = await this.countBy({
+            query: {
+                monitors: QueryHelper.inRelationArray([monitorId]),
+                currentIncidentState: {
+                    order: QueryHelper.lessThan(resolvedState?.order as number),
+                },
+                isCreatedAutomatically: false,
+            },
+            props: {
+                isRoot: true,
+            },
+        });
+
+        return incidentCount.toNumber() > 0;
+    }
+
+    public async markMonitorsActiveForMonitoring(
+        projectId: ObjectID,
+        monitors: Array<Monitor>
+    ): Promise<void> {
+        // resolve all the monitors.
+
+        if (monitors.length > 0) {
+            // get resolved monitor state.
+            const resolvedMonitorState: MonitorStatus | null =
+                await MonitorStatusService.findOneBy({
+                    query: {
+                        projectId: projectId!,
+                        isOperationalState: true,
+                    },
+                    props: {
+                        isRoot: true,
+                    },
+                    select: {
+                        _id: true,
+                    },
+                });
+
+            if (resolvedMonitorState) {
+                for (const monitor of monitors) {
+                    //check state of the monitor.
+
+                    const doesMonitorHasMoreActiveManualIncidents: boolean =
+                        await this.doesMonitorHasMoreActiveManualIncidents(
+                            monitor.id!,
+                            projectId!
+                        );
+
+                    if (doesMonitorHasMoreActiveManualIncidents) {
+                        continue;
+                    }
+
+                    await MonitorService.updateOneById({
+                        id: monitor.id!,
+                        data: {
+                            disableActiveMonitoringBecauseOfManualIncident:
+                                false,
+                        },
+                        props: {
+                            isRoot: true,
+                        },
+                    });
+
+                    const latestState: MonitorStatusTimeline | null =
+                        await MonitorStatusTimelineService.findOneBy({
+                            query: {
+                                monitorId: monitor.id!,
+                                projectId: projectId!,
+                            },
+                            select: {
+                                _id: true,
+                                monitorStatusId: true,
+                            },
+                            props: {
+                                isRoot: true,
+                            },
+                            sort: {
+                                createdAt: SortOrder.Descending,
+                            },
+                        });
+
+                    if (
+                        latestState &&
+                        latestState.monitorStatusId?.toString() ===
+                            resolvedMonitorState.id!.toString()
+                    ) {
+                        // already on this state. Skip.
+                        continue;
+                    }
+
+                    const monitorStatusTimeline: MonitorStatusTimeline =
+                        new MonitorStatusTimeline();
+                    monitorStatusTimeline.monitorId = monitor.id!;
+                    monitorStatusTimeline.projectId = projectId!;
+                    monitorStatusTimeline.monitorStatusId =
+                        resolvedMonitorState.id!;
+
+                    await MonitorStatusTimelineService.create({
+                        data: monitorStatusTimeline,
+                        props: {
+                            isRoot: true,
+                        },
+                    });
+                }
+            }
+        }
+    }
+
+    protected override async onBeforeDelete(
+        deleteBy: DeleteBy<Model>
+    ): Promise<OnDelete<Model>> {
+        const incidents: Array<Model> = await this.findBy({
+            query: deleteBy.query,
+            limit: LIMIT_MAX,
+            skip: 0,
+            select: {
+                projectId: true,
+                monitors: {
+                    _id: true,
+                },
+            },
+            props: {
+                isRoot: true,
+            },
+        });
+
+        return {
+            deleteBy,
+            carryForward: {
+                incidents: incidents,
+            },
+        };
+    }
+
+    protected override async onDeleteSuccess(
+        onDelete: OnDelete<Model>,
+        _itemIdsBeforeDelete: ObjectID[]
+    ): Promise<OnDelete<Model>> {
+        if (onDelete.carryForward && onDelete.carryForward.incidents) {
+            for (const incident of onDelete.carryForward.incidents) {
+                if (incident.monitors && incident.monitors.length > 0) {
+                    await this.markMonitorsActiveForMonitoring(
+                        incident.projectId!,
+                        incident.monitors
+                    );
+                }
+            }
+        }
+
+        return onDelete;
     }
 
     public async changeIncidentState(

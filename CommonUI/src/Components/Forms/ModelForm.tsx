@@ -1,19 +1,14 @@
-import React, {
-    MutableRefObject,
-    ReactElement,
-    useEffect,
-    useState,
-} from 'react';
+import React, { MutableRefObject, ReactElement, useState } from 'react';
 import { FormikErrors, FormikProps, FormikValues } from 'formik';
 import BaseModel from 'Common/Models/BaseModel';
 import FormValues from './Types/FormValues';
 import Fields from './Types/Fields';
 import BasicModelForm from './BasicModelForm';
-import { JSONArray, JSONObject, JSONObjectOrArray } from 'Common/Types/JSON';
+import { JSONObject } from 'Common/Types/JSON';
 import URL from 'Common/Types/API/URL';
-import HTTPResponse from 'Common/Types/API/HTTPResponse';
 import ModelAPI, {
     ListResult,
+    ModelAPIHttpResponse,
     RequestOptions,
 } from '../../Utils/ModelAPI/ModelAPI';
 import Select from '../../Utils/ModelAPI/Select';
@@ -27,7 +22,7 @@ import Permission, {
     UserPermission,
 } from 'Common/Types/Permission';
 import PermissionUtil from '../../Utils/Permission';
-import { ColumnAccessControl } from 'Common/Types/Database/AccessControl/AccessControl';
+import { ColumnAccessControl } from 'Common/Types/BaseDatabase/AccessControl';
 import BadDataException from 'Common/Types/Exception/BadDataException';
 import { LIMIT_PER_PROJECT } from 'Common/Types/Database/LimitMax';
 import FileModel from 'Common/Models/FileModel';
@@ -40,10 +35,22 @@ import API from '../../Utils/API/API';
 import { FormStep } from './Types/FormStep';
 import Field from './Types/Field';
 import { getMaxLengthFromTableColumnType } from 'Common/Types/Database/ColumnLength';
+import SelectFormFields from '../../Types/SelectEntityField';
+import User from '../../Utils/User';
 
 export enum FormType {
     Create,
     Update,
+}
+
+export interface ModelField<TBaseModel extends BaseModel>
+    extends Field<TBaseModel> {
+    overrideField?:
+        | {
+              // This is used to override the field type in the form.
+              [field: string]: true;
+          }
+        | undefined;
 }
 
 export interface ComponentProps<TBaseModel extends BaseModel> {
@@ -54,7 +61,7 @@ export interface ComponentProps<TBaseModel extends BaseModel> {
         | ((
               values: FormValues<TBaseModel>
           ) => FormikErrors<FormValues<TBaseModel>>);
-    fields: Fields<TBaseModel>;
+    fields: Array<ModelField<TBaseModel>>;
     onFormStepChange?: undefined | ((stepId: string) => void);
     steps?: undefined | Array<FormStep<TBaseModel>>;
     submitButtonText?: undefined | string;
@@ -63,13 +70,11 @@ export interface ComponentProps<TBaseModel extends BaseModel> {
     description?: undefined | string;
     showAsColumns?: undefined | number;
     disableAutofocus?: undefined | boolean;
-    footer: ReactElement;
+    footer?: ReactElement | undefined;
     onCancel?: undefined | (() => void);
-    name: string;
+    name?: string | undefined;
     onChange?: undefined | ((values: FormValues<TBaseModel>) => void);
-    onSuccess?:
-        | undefined
-        | ((data: TBaseModel | JSONObjectOrArray | Array<TBaseModel>) => void);
+    onSuccess?: undefined | ((data: TBaseModel, miscData?: JSONObject) => void);
     cancelButtonText?: undefined | string;
     maxPrimaryButtonWidth?: undefined | boolean;
     apiUrl?: undefined | URL;
@@ -83,16 +88,16 @@ export interface ComponentProps<TBaseModel extends BaseModel> {
     modelIdToEdit?: ObjectID | undefined;
     onError?: ((error: string) => void) | undefined;
     onBeforeCreate?:
-        | ((
-              item: TBaseModel | BaseModel,
-              miscDataProps: JSONObject
-          ) => Promise<TBaseModel | BaseModel>)
+        | ((item: TBaseModel, miscDataProps: JSONObject) => Promise<TBaseModel>)
         | undefined;
     saveRequestOptions?: RequestOptions | undefined;
     doNotFetchExistingModel?: boolean | undefined;
+    modelAPI?: typeof ModelAPI | undefined;
 }
 
-const ModelForm: Function = <TBaseModel extends BaseModel>(
+const ModelForm: <TBaseModel extends BaseModel>(
+    props: ComponentProps<TBaseModel>
+) => ReactElement = <TBaseModel extends BaseModel>(
     props: ComponentProps<TBaseModel>
 ): ReactElement => {
     const [fields, setFields] = useState<Fields<TBaseModel>>([]);
@@ -104,6 +109,8 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
     const [itemToEdit, setItemToEdit] = useState<TBaseModel | null>(null);
     const model: TBaseModel = new props.modelType();
 
+    const modelAPI: typeof ModelAPI = props.modelAPI || ModelAPI;
+
     const getSelectFields: Function = (): Select<TBaseModel> => {
         const select: Select<TBaseModel> = {};
         for (const field of props.fields) {
@@ -111,7 +118,7 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
                 ? (Object.keys(field.field)[0] as string)
                 : null;
 
-            if (key && hasPermissionOnField(key)) {
+            if (key && (hasPermissionOnField(key) || field.forceShow)) {
                 (select as Dictionary<boolean>)[key] = true;
             }
         }
@@ -119,30 +126,39 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
         return select;
     };
 
-    const getRelationSelect: Function = (): Select<TBaseModel> => {
-        const relationSelect: Select<TBaseModel> = {};
+    const getRelationSelect: () => Select<TBaseModel> =
+        (): Select<TBaseModel> => {
+            const relationSelect: Select<TBaseModel> = {};
 
-        for (const field of props.fields) {
-            const key: string | null = field.field
-                ? (Object.keys(field.field)[0] as string)
-                : null;
+            for (const field of props.fields) {
+                const key: string | null = field.field
+                    ? (Object.keys(field.field)[0] as string)
+                    : null;
 
-            if (key && model.isFileColumn(key)) {
-                (relationSelect as JSONObject)[key] = {
-                    file: true,
-                    _id: true,
-                    type: true,
-                    name: true,
-                };
-            } else if (key && model.isEntityColumn(key)) {
-                (relationSelect as JSONObject)[key] = (field.field as any)[key];
+                if (key && model.isFileColumn(key)) {
+                    (relationSelect as JSONObject)[key] = {
+                        file: true,
+                        _id: true,
+                        type: true,
+                        name: true,
+                    };
+                } else if (key && model.isEntityColumn(key)) {
+                    (relationSelect as JSONObject)[key] = (field.field as any)[
+                        key
+                    ];
+                }
             }
+
+            return relationSelect;
+        };
+
+    const hasPermissionOnField: (fieldName: string) => boolean = (
+        fieldName: string
+    ): boolean => {
+        if (User.isMasterAdmin()) {
+            return true; // master admin can do anything.
         }
 
-        return relationSelect;
-    };
-
-    const hasPermissionOnField: Function = (fieldName: string): boolean => {
         let userPermissions: Array<Permission> =
             PermissionUtil.getGlobalPermissions()?.globalPermissions || [];
         if (
@@ -185,11 +201,22 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
         return false;
     };
 
-    const setFormFields: Function = async (): Promise<void> => {
+    const setFormFields: () => Promise<void> = async (): Promise<void> => {
         let fieldsToSet: Fields<TBaseModel> = [];
 
         for (const field of props.fields) {
-            const keys: Array<string> = Object.keys(field.field);
+            const fieldObj:
+                | {
+                      [field: string]: true;
+                  }
+                | SelectFormFields<TBaseModel>
+                | undefined = field.field || field.overrideField;
+
+            if (!fieldObj) {
+                continue;
+            }
+
+            const keys: Array<string> = Object.keys(fieldObj);
 
             if (keys.length > 0) {
                 const key: string = keys[0] as string;
@@ -198,9 +225,19 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
 
                 if (
                     (field.forceShow || hasPermission) &&
-                    fieldsToSet.filter((i: Field<TBaseModel>) => {
+                    fieldsToSet.filter((i: ModelField<TBaseModel>) => {
+                        const fieldObj:
+                            | {
+                                  [field: string]: true;
+                              }
+                            | SelectFormFields<TBaseModel>
+                            | undefined = i.field || i.overrideField;
+
+                        if (!fieldObj) {
+                            return false;
+                        }
                         // check if field already exists. If it does, don't add it.
-                        const iKeys: Array<string> = Object.keys(i.field);
+                        const iKeys: Array<string> = Object.keys(fieldObj);
                         const iFieldKey: string = iKeys[0] as string;
                         return iFieldKey === key;
                     }).length === 0
@@ -218,7 +255,12 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
                         };
                     }
 
-                    fieldsToSet.push(field);
+                    fieldsToSet.push({
+                        ...field,
+                        field: {
+                            [key]: true,
+                        } as SelectFormFields<TBaseModel>,
+                    });
                 }
             }
         }
@@ -228,22 +270,22 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
         setFields(fieldsToSet);
     };
 
-    useEffect(() => {
+    useAsyncEffect(async () => {
         // set fields.
-        setFormFields();
+        await setFormFields();
     }, []);
 
-    useEffect(() => {
+    useAsyncEffect(async () => {
         // set fields.
-        setFormFields();
+        await setFormFields();
     }, [props.fields]);
 
-    const fetchItem: Function = async (): Promise<void> => {
+    const fetchItem: () => Promise<void> = async (): Promise<void> => {
         if (!props.modelIdToEdit || props.formType !== FormType.Update) {
             throw new BadDataException('Model ID to update not found.');
         }
 
-        let item: BaseModel | null = await ModelAPI.getItem(
+        let item: BaseModel | null = await modelAPI.getItem(
             props.modelType,
             props.modelIdToEdit,
             { ...getSelectFields(), ...getRelationSelect() }
@@ -316,7 +358,7 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
             for (const field of fields) {
                 if (field.dropdownModal && field.dropdownModal.type) {
                     const listResult: ListResult<BaseModel> =
-                        await ModelAPI.getList<BaseModel>(
+                        await modelAPI.getList<BaseModel>(
                             field.dropdownModal.type,
                             {},
                             LIMIT_PER_PROJECT,
@@ -352,11 +394,11 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
                     }
                 }
             }
-
-            setIsFetchingDropdownOptions(false);
         } catch (err) {
             setError(API.getFriendlyMessage(err));
         }
+
+        setIsFetchingDropdownOptions(false);
 
         return fields;
     };
@@ -396,7 +438,9 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
         return result;
     };
 
-    const onSubmit: Function = async (values: JSONObject): Promise<void> => {
+    const onSubmit: (values: FormValues<JSONObject>) => Promise<void> = async (
+        values: FormValues<JSONObject>
+    ): Promise<void> => {
         // Ping an API here.
         setError('');
         setLoading(true);
@@ -404,9 +448,7 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
             props.onLoadingChange(true);
         }
 
-        let result: HTTPResponse<
-            JSONObject | JSONArray | TBaseModel | Array<TBaseModel>
-        >;
+        let result: ModelAPIHttpResponse<TBaseModel>;
 
         try {
             // strip data.
@@ -482,10 +524,10 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
                 }
             }
 
-            let tBaseModel: BaseModel = JSONFunctions.fromJSON(
+            let tBaseModel: TBaseModel = JSONFunctions.fromJSON(
                 valuesToSend,
                 props.modelType
-            ) as BaseModel;
+            ) as TBaseModel;
 
             if (props.onBeforeCreate && props.formType === FormType.Create) {
                 tBaseModel = await props.onBeforeCreate(
@@ -494,7 +536,7 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
                 );
             }
 
-            result = await ModelAPI.createOrUpdate<TBaseModel>(
+            result = await modelAPI.createOrUpdate<TBaseModel>(
                 tBaseModel as TBaseModel,
                 props.modelType,
                 props.formType,
@@ -506,8 +548,13 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
                 }
             );
 
+            const miscData: JSONObject | undefined = result.miscData;
+
             if (props.onSuccess) {
-                props.onSuccess(result.data);
+                props.onSuccess(
+                    JSONFunctions.fromJSONObject(result.data, props.modelType),
+                    miscData
+                );
             }
         } catch (err) {
             setError(API.getFriendlyMessage(err));
@@ -563,7 +610,11 @@ const ModelForm: Function = <TBaseModel extends BaseModel>(
                 error={error}
                 hideSubmitButton={props.hideSubmitButton}
                 formRef={props.formRef}
-                initialValues={itemToEdit || props.initialValues}
+                initialValues={
+                    (itemToEdit || props.initialValues) as
+                        | FormValues<TBaseModel>
+                        | undefined
+                }
             ></BasicModelForm>
         </div>
     );

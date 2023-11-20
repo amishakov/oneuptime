@@ -72,6 +72,7 @@ const Modal: FunctionComponent<ComponentProps> = (
                                 ? 'sm:max-w-3xl'
                                 : ''
                         } ${!props.modalWidth ? 'sm:max-w-lg' : ''} `}
+                        data-testid="modal"
                     >
                         {props.onClose && (
                             <div className="absolute top-0 right-0 hidden pt-4 pr-4 sm:block">
@@ -80,6 +81,7 @@ const Modal: FunctionComponent<ComponentProps> = (
                                     icon={IconProp.Close}
                                     iconSize={SizeProp.Large}
                                     title="Close"
+                                    dataTestId="close-button"
                                     onClick={props.onClose}
                                 />
                             </div>
@@ -88,6 +90,7 @@ const Modal: FunctionComponent<ComponentProps> = (
                             {props.icon && (
                                 <div
                                     className={`mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full ${iconBgColor} sm:mx-0 sm:h-10 sm:w-10`}
+                                    data-testid="icon"
                                 >
                                     <Icon
                                         thick={ThickProp.Thick}
@@ -108,6 +111,7 @@ const Modal: FunctionComponent<ComponentProps> = (
                                 <div className="flex justify-between">
                                     <div>
                                         <h3
+                                            data-testid="modal-title"
                                             className={`text-lg font-medium leading-6 text-gray-900 ${
                                                 props.icon
                                                     ? 'ml-10 -mt-8 mb-5'
@@ -118,13 +122,18 @@ const Modal: FunctionComponent<ComponentProps> = (
                                             {props.title}
                                         </h3>
                                         {props.description && (
-                                            <h3 className="text-sm leading-6 text-gray-500">
+                                            <h3
+                                                data-testid="modal-description"
+                                                className="text-sm leading-6 text-gray-500"
+                                            >
                                                 {props.description}
                                             </h3>
                                         )}
                                     </div>
                                     {props.rightElement && (
-                                        <div>{props.rightElement}</div>
+                                        <div data-testid="right-element">
+                                            {props.rightElement}
+                                        </div>
                                     )}
                                 </div>
                                 <div className="mt-2">

@@ -24,7 +24,11 @@ import TableMetadata from 'Common/Types/Database/TableMetadata';
 import IconProp from 'Common/Types/Icon/IconProp';
 import AllowAccessIfSubscriptionIsUnpaid from 'Common/Types/Database/AccessControl/AllowAccessIfSubscriptionIsUnpaid';
 import ObjectID from 'Common/Types/ObjectID';
+import EnableDocumentation from 'Common/Types/Database/EnableDocumentation';
 
+@EnableDocumentation({
+    isMasterAdminApiDocs: true,
+})
 @AllowAccessIfSubscriptionIsUnpaid()
 @TableAccessControl({
     create: [Permission.Public],
@@ -570,6 +574,90 @@ class User extends UserModel {
         unique: false,
     })
     public alertPhoneVerificationCode?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.Public],
+        read: [],
+        update: [],
+    })
+    @TableColumn({ type: TableColumnType.LongText })
+    @Column({
+        type: ColumnType.LongText,
+        length: ColumnLength.LongText,
+        nullable: true,
+        unique: false,
+    })
+    public utmSource?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.Public],
+        read: [],
+        update: [],
+    })
+    @TableColumn({ type: TableColumnType.LongText })
+    @Column({
+        type: ColumnType.LongText,
+        length: ColumnLength.LongText,
+        nullable: true,
+        unique: false,
+    })
+    public utmMedium?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.Public],
+        read: [],
+        update: [],
+    })
+    @TableColumn({ type: TableColumnType.LongText })
+    @Column({
+        type: ColumnType.LongText,
+        length: ColumnLength.LongText,
+        nullable: true,
+        unique: false,
+    })
+    public utmCampaign?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.Public],
+        read: [],
+        update: [],
+    })
+    @TableColumn({ type: TableColumnType.LongText })
+    @Column({
+        type: ColumnType.LongText,
+        length: ColumnLength.LongText,
+        nullable: true,
+        unique: false,
+    })
+    public utmTerm?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.Public],
+        read: [],
+        update: [],
+    })
+    @TableColumn({ type: TableColumnType.LongText })
+    @Column({
+        type: ColumnType.LongText,
+        length: ColumnLength.LongText,
+        nullable: true,
+        unique: false,
+    })
+    public utmContent?: string = undefined;
+
+    @ColumnAccessControl({
+        create: [Permission.Public],
+        read: [],
+        update: [],
+    })
+    @TableColumn({ type: TableColumnType.LongText })
+    @Column({
+        type: ColumnType.LongText,
+        length: ColumnLength.LongText,
+        nullable: true,
+        unique: false,
+    })
+    public utmUrl?: string = undefined;
 
     @ColumnAccessControl({
         create: [],

@@ -25,20 +25,32 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     fi
 fi
 
-# If linux
-if [[ "$OSTYPE" != "darwin"* ]]; then
+
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+  DISTRIB=$(awk -F= '/^ID/{print $2}' /etc/os-release)
+  if [[ ${DISTRIB} = "ubuntu"* ]]; then
+    echo "Grabbing latest apt caches"
+    sudo apt-get update
+  elif [[ ${DISTRIB} = "debian"* ]]; then
     echo "Grabbing latest apt caches"
     sudo apt update
+  fi
 fi
+
 
 # clone oneuptime
 echo "Installing OneUptime 🟢"
 if [[ ! $(which git) ]]; then
-    if [[ "$OSTYPE" != "darwin"* ]]; then
-        sudo apt install -y git
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+      DISTRIB=$(awk -F= '/^ID/{print $2}' /etc/os-release)
+      if [[ ${DISTRIB} = "ubuntu"* ]] || [[ ${DISTRIB} = "debian"* ]]; then
+        sudo apt install -y git curl
+      elif [[ ${DISTRIB} = "fedora"* ]] || [[ ${DISTRIB} = "almalinux"* ]] || [[ ${DISTRIB} = "rockylinux"* ]] || [[ ${DISTRIB} = "rhel"* ]]; then
+        sudo dnf install git curl -y
+      fi
     fi
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        brew install git
+        brew install git curl
     fi
 fi
 
@@ -88,11 +100,16 @@ if [[ ! $(which node) && ! $(node --version) ]]; then
     fi
 fi
 
-
-if [[ ! $(which npm) && ! $(npm --version) ]]; then
-    if [[ "$OSTYPE" != "darwin"* ]]; then
+if [[ ! $(which npm) ]]; then
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+      DISTRIB=$(awk -F= '/^ID/{print $2}' /etc/os-release)
+      if [[ ${DISTRIB} = "ubuntu"* ]] || [[ ${DISTRIB} = "debian"* ]]; then
         echo "Setting up NPM"
         sudo apt-get install -y npm
+      elif [[ ${DISTRIB} = "fedora"* ]] || [[ ${DISTRIB} = "almalinux"* ]] || [[ ${DISTRIB} = "rockylinux"* ]] || [[ ${DISTRIB} = "rhel"* ]]; then
+        echo "Setting up NPM"
+        sudo dnf install -y npm
+      fi
     fi
 fi
 
@@ -153,7 +170,7 @@ touch config.env
 source ~/.bashrc
 
 #Run a scirpt to merge config.env.tpl to config.env
-ts-node-esm ./Scripts/Install/MergeEnvTemplate.ts
+node ./Scripts/Install/MergeEnvTemplate.js
 
 
 # Load env values from config.env

@@ -17,9 +17,9 @@ import ColumnAccessControl from 'Common/Types/Database/AccessControl/ColumnAcces
 import UniqueColumnBy from 'Common/Types/Database/UniqueColumnBy';
 import TenantColumn from 'Common/Types/Database/TenantColumn';
 import TableMetadata from 'Common/Types/Database/TableMetadata';
-import EnableWorkflow from 'Common/Types/Model/EnableWorkflow';
+import EnableWorkflow from 'Common/Types/Database/EnableWorkflow';
 import IconProp from 'Common/Types/Icon/IconProp';
-import EnableDocumentation from 'Common/Types/Model/EnableDocumentation';
+import EnableDocumentation from 'Common/Types/Database/EnableDocumentation';
 import TableBillingAccessControl from 'Common/Types/Database/AccessControl/TableBillingAccessControl';
 import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
 
@@ -27,7 +27,7 @@ import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
     create: PlanSelect.Growth,
     read: PlanSelect.Free,
     update: PlanSelect.Growth,
-    delete: PlanSelect.Growth,
+    delete: PlanSelect.Free,
 })
 @EnableDocumentation()
 @TenantColumn('projectId')
@@ -35,6 +35,7 @@ import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
     create: [
         Permission.ProjectOwner,
         Permission.ProjectAdmin,
+        Permission.ProjectMember,
         Permission.CanCreateProjectLabel,
     ],
     read: [
@@ -46,11 +47,13 @@ import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
     delete: [
         Permission.ProjectOwner,
         Permission.ProjectAdmin,
+        Permission.ProjectMember,
         Permission.CanDeleteProjectLabel,
     ],
     update: [
         Permission.ProjectOwner,
         Permission.ProjectAdmin,
+        Permission.ProjectMember,
         Permission.CanEditProjectLabel,
     ],
 })
@@ -78,6 +81,7 @@ export default class Label extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateProjectLabel,
         ],
         read: [
@@ -114,6 +118,7 @@ export default class Label extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateProjectLabel,
         ],
         read: [
@@ -144,6 +149,7 @@ export default class Label extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateProjectLabel,
         ],
         read: [
@@ -155,6 +161,7 @@ export default class Label extends AccessControlModel {
         update: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanEditProjectLabel,
         ],
     })
@@ -201,6 +208,7 @@ export default class Label extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateProjectLabel,
         ],
         read: [
@@ -212,6 +220,7 @@ export default class Label extends AccessControlModel {
         update: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanEditProjectLabel,
         ],
     })
@@ -232,6 +241,7 @@ export default class Label extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateProjectLabel,
         ],
         read: [
@@ -268,6 +278,7 @@ export default class Label extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateProjectLabel,
         ],
         read: [
@@ -350,6 +361,7 @@ export default class Label extends AccessControlModel {
         create: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanCreateProjectLabel,
         ],
         read: [
@@ -361,6 +373,7 @@ export default class Label extends AccessControlModel {
         update: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanEditProjectLabel,
         ],
     })

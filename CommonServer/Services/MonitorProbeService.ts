@@ -1,8 +1,10 @@
 import PostgresDatabase from '../Infrastructure/PostgresDatabase';
-import DatabaseService, { OnCreate } from './DatabaseService';
+import DatabaseService from './DatabaseService';
+import { OnCreate } from '../Types/Database/Hooks';
 import CreateBy from '../Types/Database/CreateBy';
 import BadDataException from 'Common/Types/Exception/BadDataException';
 import MonitorProbe from 'Model/Models/MonitorProbe';
+import OneUptimeDate from 'Common/Types/Date';
 
 export class Service extends DatabaseService<MonitorProbe> {
     public constructor(postgresDatabase?: PostgresDatabase) {
@@ -19,8 +21,8 @@ export class Service extends DatabaseService<MonitorProbe> {
             const monitorProbe: MonitorProbe | null = await this.findOneBy({
                 query: {
                     monitorId:
-                        createBy.data.monitorId! || createBy.data.monitor?.id!,
-                    probeId: createBy.data.probeId! || createBy.data.probe?.id!,
+                        createBy.data.monitorId! || createBy.data.monitor?.id,
+                    probeId: createBy.data.probeId! || createBy.data.probe?.id,
                 },
                 select: {
                     _id: true,
@@ -35,6 +37,14 @@ export class Service extends DatabaseService<MonitorProbe> {
                     'Probe is already added to this monitor.'
                 );
             }
+        }
+
+        if (!createBy.data.nextPingAt) {
+            createBy.data.nextPingAt = OneUptimeDate.getCurrentDate();
+        }
+
+        if (!createBy.data.lastPingAt) {
+            createBy.data.lastPingAt = OneUptimeDate.getCurrentDate();
         }
 
         return { createBy, carryForward: null };

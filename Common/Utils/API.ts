@@ -154,7 +154,7 @@ export default class API {
         return Promise.resolve(headers);
     }
 
-    public static getDefaultHeaders(): Headers {
+    public static getDefaultHeaders(_props?: any): Headers {
         const defaultHeaders: Headers = {
             'Access-Control-Allow-Origin': '*',
             Accept: 'application/json',
@@ -243,11 +243,32 @@ export default class API {
         }
 
         try {
+            const finalHeaders: Dictionary<string> = {
+                ...apiHeaders,
+                ...headers,
+            };
+
+            let finalBody:
+                | JSONObject
+                | JSONArray
+                | URLSearchParams
+                | undefined = data;
+
+            // if content-type is form-url-encoded, then stringify the data
+
+            if (
+                finalHeaders['Content-Type'] ===
+                    'application/x-www-form-urlencoded' &&
+                data
+            ) {
+                finalBody = new URLSearchParams(data as Dictionary<string>);
+            }
+
             const result: AxiosResponse = await axios({
                 method: method,
                 url: url.toString(),
-                headers: { ...apiHeaders, ...headers },
-                data,
+                headers: finalHeaders,
+                data: finalBody,
             });
 
             result.headers = await this.onResponseSuccessHeaders(
@@ -257,7 +278,7 @@ export default class API {
             const response: HTTPResponse<T> = new HTTPResponse<T>(
                 result.status,
                 result.data,
-                result.headers
+                result.headers as Dictionary<string>
             );
 
             return response;
@@ -280,11 +301,11 @@ export default class API {
         if (error.response) {
             return new HTTPErrorResponse(
                 error.response.status,
-                error.response.data,
-                error.response.headers
+                error.response.data as JSONObject | JSONArray,
+                error.response.headers as Dictionary<string>
             );
         }
 
-        throw new APIException('No error response body');
+        throw new APIException('Endpoint is not available');
     }
 }

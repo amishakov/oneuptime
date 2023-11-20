@@ -1,4 +1,4 @@
-import React, { FunctionComponent, ReactElement, useState } from 'react';
+import React, { ReactElement, useState } from 'react';
 import IconProp from 'Common/Types/Icon/IconProp';
 import ModelFormModal from 'CommonUI/src/Components/ModelFormModal/ModelFormModal';
 import Project from 'Model/Models/Project';
@@ -12,7 +12,7 @@ import { BILLING_ENABLED, getAllEnvVars } from 'CommonUI/src/Config';
 import DashboardNavigation from '../../Utils/Navigation';
 import Toggle from 'CommonUI/src/Components/Toggle/Toggle';
 
-const Upgrade: FunctionComponent = (): ReactElement => {
+const Upgrade: () => JSX.Element = (): ReactElement => {
     const [showModal, setShowModal] = useState<boolean>(false);
     const [isSubscriptionPlanYearly, setIsSubscriptionPlanYearly] =
         useState<boolean>(true);
@@ -58,10 +58,11 @@ const Upgrade: FunctionComponent = (): ReactElement => {
                         Navigation.reload();
                     }}
                     formProps={{
+                        name: 'Change Plan',
                         saveRequestOptions: {
                             isMultiTenantRequest: true, // because this is a tenant request, we do not have to include the header in the request
                         },
-                        model: new Project(),
+                        modelType: Project,
                         id: 'create-project-from',
                         fields: [
                             {

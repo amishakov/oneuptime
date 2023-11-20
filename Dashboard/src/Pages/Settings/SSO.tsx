@@ -9,7 +9,6 @@ import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import DropdownUtil from 'CommonUI/src/Utils/Dropdown';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
-import IconProp from 'Common/Types/Icon/IconProp';
 import DashboardNavigation from '../../Utils/Navigation';
 import Navigation from 'CommonUI/src/Utils/Navigation';
 import ProjectSSO from 'Model/Models/ProjectSso';
@@ -79,11 +78,28 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                     isEditable={true}
                     isCreateable={true}
                     cardProps={{
-                        icon: IconProp.Lock,
                         title: 'Single Sign On (SSO)',
                         description:
                             'Single sign-on is an authentication scheme that allows a user to log in with a single ID to any of several related, yet independent, software systems.',
                     }}
+                    formSteps={[
+                        {
+                            title: 'Baisc Info',
+                            id: 'basic',
+                        },
+                        {
+                            title: 'Sign On',
+                            id: 'sign-on',
+                        },
+                        {
+                            title: 'Certificate',
+                            id: 'certificate',
+                        },
+                        {
+                            title: 'More',
+                            id: 'more',
+                        },
+                    ]}
                     noItemsMessage={'No SSO configuration found.'}
                     viewPageRoute={Navigation.getCurrentRoute()}
                     formFields={[
@@ -99,6 +115,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                             validation: {
                                 minLength: 2,
                             },
+                            stepId: 'basic',
                         },
                         {
                             field: {
@@ -113,6 +130,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                             validation: {
                                 minLength: 2,
                             },
+                            stepId: 'basic',
                         },
                         {
                             field: {
@@ -125,6 +143,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                                 'Members will be forwarded here when signing in to your organization',
                             placeholder:
                                 'https://yourapp.example.com/apps/appId',
+                            stepId: 'sign-on',
                         },
                         {
                             field: {
@@ -136,6 +155,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                             fieldType: FormFieldSchemaType.URL,
                             required: true,
                             placeholder: 'https://example.com',
+                            stepId: 'sign-on',
                         },
                         {
                             field: {
@@ -146,6 +166,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                             fieldType: FormFieldSchemaType.LongText,
                             required: true,
                             placeholder: 'Paste in your x509 certificate here.',
+                            stepId: 'certificate',
                         },
                         {
                             field: {
@@ -161,6 +182,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                                 ),
                             required: true,
                             placeholder: 'RSA-SHA256',
+                            stepId: 'certificate',
                         },
                         {
                             field: {
@@ -176,6 +198,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                                 ),
                             required: true,
                             placeholder: 'SHA256',
+                            stepId: 'certificate',
                         },
                         {
                             field: {
@@ -185,6 +208,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                                 'You can test this first, before enabling it. To test, please save the config.',
                             title: 'Enabled',
                             fieldType: FormFieldSchemaType.Toggle,
+                            stepId: 'more',
                         },
                         {
                             field: {
@@ -201,6 +225,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                             },
                             required: true,
                             placeholder: 'Select Teams',
+                            stepId: 'more',
                         },
                     ]}
                     showRefreshButton={true}
@@ -298,7 +323,6 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                     cardProps={{
                         title: 'SSO Settings',
                         description: 'Configure settings for SSO.',
-                        icon: IconProp.Lock,
                     }}
                     isEditable={true}
                     formFields={[
@@ -326,7 +350,7 @@ const SSOPage: FunctionComponent<PageComponentProps> = (
                                     'Please test SSO before you enable this feature. If SSO is not tested properly then you will be locked out of the project.',
                             },
                         ],
-                        modelId: DashboardNavigation.getProjectId()?.toString(),
+                        modelId: DashboardNavigation.getProjectId()!,
                     }}
                 />
 

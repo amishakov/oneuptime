@@ -34,7 +34,8 @@ export default interface Field<TEntity> {
     name?: string; // form field name, should be unique in thr form. If not provided, the field will be auto generated.
     title?: string;
     description?: string;
-    field: SelectFormFields<TEntity>;
+    field?: SelectFormFields<TEntity> | undefined;
+
     placeholder?: string;
     forceShow?: boolean; // show this field even if user does not have permissions to view.
     disabled?: boolean;
@@ -65,7 +66,7 @@ export default interface Field<TEntity> {
         | undefined;
     styleType?: FormFieldStyleType | undefined;
     showIf?: ((item: FormValues<TEntity>) => boolean) | undefined;
-    onChange?: ((value: any) => void) | undefined;
+    onChange?: ((value: any, form?: any | undefined) => void) | undefined;
     fieldType?: FormFieldSchemaType;
     overrideFieldKey?: string;
     defaultValue?: boolean | string | undefined;

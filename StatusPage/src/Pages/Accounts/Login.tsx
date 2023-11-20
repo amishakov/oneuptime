@@ -31,26 +31,9 @@ const LoginPage: FunctionComponent<ComponentProps> = (
         if (props.forceSSO && StatusPageUtil.getStatusPageId()) {
             if (Navigation.getQueryStringByName('redirectUrl')) {
                 // forward redirect url to sso page
-                Navigation.navigate(
-                    new Route(
-                        (!StatusPageUtil.isPreviewPage()
-                            ? RouteUtil.populateRouteParams(
-                                  RouteMap[PageMap.SSO]!,
-                                  StatusPageUtil.getStatusPageId()!
-                              )
-                            : RouteUtil.populateRouteParams(
-                                  RouteMap[PageMap.PREVIEW_SSO]!,
-                                  StatusPageUtil.getStatusPageId()!
-                              )
-                        ).toString() +
-                            `?redirectUrl=${Navigation.getQueryStringByName(
-                                'redirectUrl'
-                            )}`
-                    )
-                );
-            } else {
-                Navigation.navigate(
-                    !StatusPageUtil.isPreviewPage()
+
+                const navRoute: Route = new Route(
+                    (!StatusPageUtil.isPreviewPage()
                         ? RouteUtil.populateRouteParams(
                               RouteMap[PageMap.SSO]!,
                               StatusPageUtil.getStatusPageId()!
@@ -59,7 +42,25 @@ const LoginPage: FunctionComponent<ComponentProps> = (
                               RouteMap[PageMap.PREVIEW_SSO]!,
                               StatusPageUtil.getStatusPageId()!
                           )
+                    ).toString() +
+                        `?redirectUrl=${Navigation.getQueryStringByName(
+                            'redirectUrl'
+                        )}`
                 );
+
+                Navigation.navigate(navRoute);
+            } else {
+                const navRoute: Route = !StatusPageUtil.isPreviewPage()
+                    ? RouteUtil.populateRouteParams(
+                          RouteMap[PageMap.SSO]!,
+                          StatusPageUtil.getStatusPageId()!
+                      )
+                    : RouteUtil.populateRouteParams(
+                          RouteMap[PageMap.PREVIEW_SSO]!,
+                          StatusPageUtil.getStatusPageId()!
+                      );
+
+                Navigation.navigate(navRoute);
             }
         }
     }, [props.forceSSO, StatusPageUtil.getStatusPageId()]);
@@ -71,13 +72,13 @@ const LoginPage: FunctionComponent<ComponentProps> = (
     }
 
     if (!StatusPageUtil.isPrivateStatusPage()) {
-        Navigation.navigate(
-            new Route(
-                StatusPageUtil.isPreviewPage()
-                    ? `/status-page/${StatusPageUtil.getStatusPageId()?.toString()}`
-                    : '/'
-            )
+        const navRoute: Route = new Route(
+            StatusPageUtil.isPreviewPage()
+                ? `/status-page/${StatusPageUtil.getStatusPageId()?.toString()}`
+                : '/'
         );
+
+        Navigation.navigate(navRoute);
     }
 
     if (
@@ -89,13 +90,13 @@ const LoginPage: FunctionComponent<ComponentProps> = (
                 new Route(Navigation.getQueryStringByName('redirectUrl')!)
             );
         } else {
-            Navigation.navigate(
-                new Route(
-                    StatusPageUtil.isPreviewPage()
-                        ? `/status-page/${StatusPageUtil.getStatusPageId()?.toString()}`
-                        : '/'
-                )
+            const navRoute: Route = new Route(
+                StatusPageUtil.isPreviewPage()
+                    ? `/status-page/${StatusPageUtil.getStatusPageId()?.toString()}`
+                    : '/'
             );
+
+            Navigation.navigate(navRoute);
         }
     }
 
@@ -161,8 +162,14 @@ const LoginPage: FunctionComponent<ComponentProps> = (
                         apiUrl={apiUrl}
                         formType={FormType.Create}
                         submitButtonText={'Login'}
-                        onSuccess={(value: JSONObject) => {
-                            LoginUtil.login(value);
+                        onSuccess={(
+                            value: StatusPagePrivateUser,
+                            miscData: JSONObject | undefined
+                        ) => {
+                            LoginUtil.login({
+                                user: value,
+                                token: miscData ? miscData['token'] : undefined,
+                            });
 
                             if (
                                 Navigation.getQueryStringByName('redirectUrl')
@@ -184,7 +191,9 @@ const LoginPage: FunctionComponent<ComponentProps> = (
                                 );
                             }
                         }}
-                        onBeforeCreate={(item: StatusPagePrivateUser) => {
+                        onBeforeCreate={(
+                            item: StatusPagePrivateUser
+                        ): Promise<StatusPagePrivateUser> => {
                             if (!StatusPageUtil.getStatusPageId()) {
                                 throw new BadDataException(
                                     'Status Page ID not found'
@@ -193,7 +202,7 @@ const LoginPage: FunctionComponent<ComponentProps> = (
 
                             item.statusPageId =
                                 StatusPageUtil.getStatusPageId()!;
-                            return item;
+                            return Promise.resolve(item);
                         }}
                         maxPrimaryButtonWidth={true}
                         footer={

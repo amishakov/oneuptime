@@ -1,6 +1,6 @@
-import React, { FunctionComponent, ReactElement } from 'react';
+import React, { ReactElement } from 'react';
 
-const UserProfileDropdownDivider: FunctionComponent = (): ReactElement => {
+const UserProfileDropdownDivider: () => JSX.Element = (): ReactElement => {
     return <div className="dropdown-divider"></div>;
 };
 

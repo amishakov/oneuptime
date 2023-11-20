@@ -3,7 +3,6 @@ import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import Monitor from 'Model/Models/Monitor';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
-import IconProp from 'Common/Types/Icon/IconProp';
 import Label from 'Model/Models/Label';
 import { JSONArray, JSONObject } from 'Common/Types/JSON';
 import LabelsElement from '../../Components/Label/Labels';
@@ -26,8 +25,6 @@ import {
 import { ModalWidth } from 'CommonUI/src/Components/Modal/Modal';
 import MonitoringInterval from '../../Utils/MonitorIntervalDropdownOptions';
 import MonitorStepsType from 'Common/Types/Monitor/MonitorSteps';
-import Team from 'Model/Models/Team';
-import ProjectUser from '../../Utils/ProjectUser';
 import { Grey } from 'Common/Types/BrandColors';
 
 export interface ComponentProps {
@@ -51,7 +48,7 @@ const MonitorsTable: FunctionComponent<ComponentProps> = (
             isEditable={false}
             isCreateable={true}
             isViewable={true}
-            query={props.query}
+            query={props.query || {}}
             createEditModalWidth={ModalWidth.Large}
             formSteps={[
                 {
@@ -75,17 +72,8 @@ const MonitorsTable: FunctionComponent<ComponentProps> = (
                         );
                     },
                 },
-                {
-                    title: 'Owners',
-                    id: 'owners',
-                },
-                {
-                    title: 'Labels',
-                    id: 'labels',
-                },
             ]}
             cardProps={{
-                icon: IconProp.AltGlobe,
                 title: props.title || 'Monitors',
                 description:
                     props.description ||
@@ -175,61 +163,6 @@ const MonitorsTable: FunctionComponent<ComponentProps> = (
                     dropdownOptions: MonitoringInterval,
                     placeholder: 'Select Monitoring Interval',
                 },
-                {
-                    field: {
-                        ownerTeams: true,
-                    },
-                    forceShow: true,
-                    title: 'Owner - Teams',
-                    stepId: 'owners',
-                    description:
-                        'Select which teams own this monitor. They will be notified when monitor status changes.',
-                    fieldType: FormFieldSchemaType.MultiSelectDropdown,
-                    dropdownModal: {
-                        type: Team,
-                        labelField: 'name',
-                        valueField: '_id',
-                    },
-                    required: false,
-                    placeholder: 'Select Teams',
-                    overrideFieldKey: 'ownerTeams',
-                },
-                {
-                    field: {
-                        ownerUsers: true,
-                    },
-                    forceShow: true,
-                    title: 'Owner - Users',
-                    stepId: 'owners',
-                    description:
-                        'Select which users own this incident. They will be notified when monitor status changes.',
-                    fieldType: FormFieldSchemaType.MultiSelectDropdown,
-                    fetchDropdownOptions: async () => {
-                        return await ProjectUser.fetchProjectUsersAsDropdownOptions(
-                            DashboardNavigation.getProjectId()!
-                        );
-                    },
-                    required: false,
-                    placeholder: 'Select Users',
-                    overrideFieldKey: 'ownerUsers',
-                },
-                {
-                    field: {
-                        labels: true,
-                    },
-                    title: 'Labels ',
-                    stepId: 'labels',
-                    description:
-                        'Team members with access to these labels will only be able to access this resource. This is optional and an advanced feature.',
-                    fieldType: FormFieldSchemaType.MultiSelectDropdown,
-                    dropdownModal: {
-                        type: Label,
-                        labelField: 'name',
-                        valueField: '_id',
-                    },
-                    required: false,
-                    placeholder: 'Labels',
-                },
             ]}
             showRefreshButton={true}
             showFilterButton={true}
@@ -250,7 +183,7 @@ const MonitorsTable: FunctionComponent<ComponentProps> = (
                     title: 'Monitor Type',
                     type: FieldType.Text,
                     isFilterable: true,
-                    filterDropdownField:
+                    filterDropdownOptions:
                         MonitorTypeUtil.monitorTypesAsDropdownOptions(),
                 },
                 {
@@ -281,7 +214,11 @@ const MonitorsTable: FunctionComponent<ComponentProps> = (
 
                         if (item && item['disableActiveMonitoring']) {
                             return (
-                                <Statusbubble color={Grey} text={'Disabled'} />
+                                <Statusbubble
+                                    shouldAnimate={false}
+                                    color={Grey}
+                                    text={'Disabled'}
+                                />
                             );
                         }
 
@@ -294,6 +231,7 @@ const MonitorsTable: FunctionComponent<ComponentProps> = (
                                         ] as JSONObject
                                     )['color'] as Color
                                 }
+                                shouldAnimate={true}
                                 text={
                                     (
                                         item[

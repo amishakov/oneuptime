@@ -9,12 +9,11 @@ import DashboardNavigation from '../../../Utils/Navigation';
 import ObjectID from 'Common/Types/ObjectID';
 import StatusPage from 'Model/Models/StatusPage';
 import CardModelDetail from 'CommonUI/src/Components/ModelDetail/CardModelDetail';
-import IconProp from 'Common/Types/Icon/IconProp';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import StatusPageFooterLink from 'Model/Models/StatusPageFooterLink';
-import SortOrder from 'Common/Types/Database/SortOrder';
+import SortOrder from 'Common/Types/BaseDatabase/SortOrder';
 import BadDataException from 'Common/Types/Exception/BadDataException';
 import Navigation from 'CommonUI/src/Utils/Navigation';
 
@@ -68,7 +67,6 @@ const StatusPageDelete: FunctionComponent<PageComponentProps> = (
                 cardProps={{
                     title: 'Copyright Info',
                     description: 'Copyright info for your status page',
-                    icon: IconProp.Text,
                 }}
                 isEditable={true}
                 editButtonText={'Edit Copyright'}
@@ -127,7 +125,6 @@ const StatusPageDelete: FunctionComponent<PageComponentProps> = (
                     return Promise.resolve(item);
                 }}
                 cardProps={{
-                    icon: IconProp.Link,
                     title: 'Footer Links',
                     description: 'Footer Links for your status page',
                 }}

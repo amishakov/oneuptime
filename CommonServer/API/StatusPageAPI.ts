@@ -12,10 +12,10 @@ import {
 } from '../Utils/Express';
 import BaseAPI from './BaseAPI';
 import Response from '../Utils/Response';
-import NotAuthorizedException from 'Common/Types/Exception/NotAuthorizedException';
+import NotAuthenticatedException from 'Common/Types/Exception/NotAuthenticatedException';
 import BadDataException from 'Common/Types/Exception/BadDataException';
 import StatusPageFooterLinkService from '../Services/StatusPageFooterLinkService';
-import { LIMIT_PER_PROJECT } from 'Common/Types/Database/LimitMax';
+import LIMIT_MAX, { LIMIT_PER_PROJECT } from 'Common/Types/Database/LimitMax';
 import StatusPageFooterLink from 'Model/Models/StatusPageFooterLink';
 import StatusPageHeaderLinkService from '../Services/StatusPageHeaderLinkService';
 import StatusPageHeaderLink from 'Model/Models/StatusPageHeaderLink';
@@ -30,7 +30,7 @@ import MonitorStatusService from '../Services/MonitorStatusService';
 import OneUptimeDate from 'Common/Types/Date';
 import MonitorStatusTimelineService from '../Services/MonitorStatusTimelineService';
 import QueryHelper from '../Types/Database/QueryHelper';
-import SortOrder from 'Common/Types/Database/SortOrder';
+import SortOrder from 'Common/Types/BaseDatabase/SortOrder';
 import IncidentService from '../Services/IncidentService';
 import IncidentPublicNote from 'Model/Models/IncidentPublicNote';
 import IncidentPublicNoteService from '../Services/IncidentPublicNoteService';
@@ -47,7 +47,7 @@ import IncidentStateTimeline from 'Model/Models/IncidentStateTimeline';
 import IncidentStateTimelineService from '../Services/IncidentStateTimelineService';
 import ScheduledMaintenanceStateTimeline from 'Model/Models/ScheduledMaintenanceStateTimeline';
 import ScheduledMaintenanceStateTimelineService from '../Services/ScheduledMaintenanceStateTimelineService';
-import DatabaseCommonInteractionProps from 'Common/Types/Database/DatabaseCommonInteractionProps';
+import DatabaseCommonInteractionProps from 'Common/Types/BaseDatabase/DatabaseCommonInteractionProps';
 import Query from '../Types/Database/Query';
 import JSONFunctions from 'Common/Types/JSONFunctions';
 import GreenlockChallenge from 'Model/Models/GreenlockChallenge';
@@ -61,6 +61,14 @@ import PositiveNumber from 'Common/Types/PositiveNumber';
 import StatusPageSsoService from '../Services/StatusPageSsoService';
 import StatusPageSSO from 'Model/Models/StatusPageSso';
 import ArrayUtil from 'Common/Types/ArrayUtil';
+import Dictionary from 'Common/Types/Dictionary';
+import MonitorGroupService from '../Services/MonitorGroupService';
+import MonitorGroupResource from 'Model/Models/MonitorGroupResource';
+import MonitorGroupResourceService from '../Services/MonitorGroupResourceService';
+import IncidentState from 'Model/Models/IncidentState';
+import IncidentStateService from '../Services/IncidentStateService';
+import ScheduledMaintenanceState from 'Model/Models/ScheduledMaintenanceState';
+import ScheduledMaintenanceStateService from '../Services/ScheduledMaintenanceStateService';
 
 export default class StatusPageAPI extends BaseAPI<
     StatusPage,
@@ -73,7 +81,7 @@ export default class StatusPageAPI extends BaseAPI<
         this.router.get(
             `${new this.entityType()
                 .getCrudApiPath()
-                ?.toString()}/status-page-api/cname-verification/:token`,
+                ?.toString()}/cname-verification/:token`,
             async (req: ExpressRequest, res: ExpressResponse) => {
                 const host: string | undefined = req.get('host');
 
@@ -391,6 +399,9 @@ export default class StatusPageAPI extends BaseAPI<
                 res: ExpressResponse,
                 next: NextFunction
             ) => {
+                const startDate: Date = OneUptimeDate.getSomeDaysAgo(90);
+                const endDate: Date = OneUptimeDate.getCurrentDate();
+
                 try {
                     const objectId: ObjectID = new ObjectID(
                         req.params['statusPageId'] as string
@@ -403,8 +414,8 @@ export default class StatusPageAPI extends BaseAPI<
                             req
                         ))
                     ) {
-                        throw new NotAuthorizedException(
-                            'You are not authorized to access this status page'
+                        throw new NotAuthenticatedException(
+                            'You are not authenticated to access this status page'
                         );
                     }
 
@@ -418,6 +429,8 @@ export default class StatusPageAPI extends BaseAPI<
                                 projectId: true,
                                 isPublicStatusPage: true,
                                 overviewPageDescription: true,
+                                showIncidentLabelsOnStatusPage: true,
+                                showScheduledEventLabelsOnStatusPage: true,
                             },
                             props: {
                                 isRoot: true,
@@ -493,8 +506,10 @@ export default class StatusPageAPI extends BaseAPI<
                                     _id: true,
                                     currentMonitorStatusId: true,
                                 },
+                                monitorGroupId: true,
+                                showUptimePercent: true,
+                                uptimePercentPrecision: true,
                             },
-
                             sort: {
                                 order: SortOrder.Ascending,
                             },
@@ -505,13 +520,28 @@ export default class StatusPageAPI extends BaseAPI<
                             },
                         });
 
+                    const monitorGroupIds: Array<ObjectID> = statusPageResources
+                        .map((resource: StatusPageResource) => {
+                            return resource.monitorGroupId!;
+                        })
+                        .filter((id: ObjectID) => {
+                            return Boolean(id); // remove nulls
+                        });
+
+                    // get monitors in the group.
+                    const monitorGroupCurrentStatuses: Dictionary<ObjectID> =
+                        {};
+                    const monitorsInGroup: Dictionary<Array<ObjectID>> = {};
+
                     // get monitor status charts.
                     const monitorsOnStatusPage: Array<ObjectID> =
-                        statusPageResources.map(
-                            (monitor: StatusPageResource) => {
+                        statusPageResources
+                            .map((monitor: StatusPageResource) => {
                                 return monitor.monitorId!;
-                            }
-                        );
+                            })
+                            .filter((id: ObjectID) => {
+                                return Boolean(id); // remove nulls
+                            });
 
                     const monitorsOnStatusPageForTimeline: Array<ObjectID> =
                         statusPageResources
@@ -520,10 +550,99 @@ export default class StatusPageAPI extends BaseAPI<
                             })
                             .map((monitor: StatusPageResource) => {
                                 return monitor.monitorId!;
+                            })
+                            .filter((id: ObjectID) => {
+                                return Boolean(id); // remove nulls
                             });
 
-                    const startDate: Date = OneUptimeDate.getSomeDaysAgo(90);
-                    const endDate: Date = OneUptimeDate.getCurrentDate();
+                    for (const monitorGroupId of monitorGroupIds) {
+                        // get current status of monitors in the group.
+
+                        const currentStatus: MonitorStatus =
+                            await MonitorGroupService.getCurrentStatus(
+                                monitorGroupId,
+                                {
+                                    isRoot: true,
+                                }
+                            );
+
+                        monitorGroupCurrentStatuses[monitorGroupId.toString()] =
+                            currentStatus.id!;
+
+                        // get monitors in the group.
+
+                        const groupResources: Array<MonitorGroupResource> =
+                            await MonitorGroupResourceService.findBy({
+                                query: {
+                                    monitorGroupId: monitorGroupId,
+                                },
+                                select: {
+                                    monitorId: true,
+                                },
+                                props: {
+                                    isRoot: true,
+                                },
+                                limit: LIMIT_PER_PROJECT,
+                                skip: 0,
+                            });
+
+                        const monitorsInGroupIds: Array<ObjectID> =
+                            groupResources
+                                .map((resource: MonitorGroupResource) => {
+                                    return resource.monitorId!;
+                                })
+                                .filter((id: ObjectID) => {
+                                    return Boolean(id); // remove nulls
+                                });
+
+                        const shouldShowTimelineForThisGroup: boolean = Boolean(
+                            statusPageResources.find(
+                                (resource: StatusPageResource) => {
+                                    return (
+                                        resource.monitorGroupId?.toString() ===
+                                            monitorGroupId.toString() &&
+                                        (resource.showStatusHistoryChart ||
+                                            resource.showUptimePercent)
+                                    );
+                                }
+                            )
+                        );
+
+                        for (const monitorId of monitorsInGroupIds) {
+                            if (!monitorId) {
+                                continue;
+                            }
+
+                            if (
+                                !monitorsOnStatusPage.find((item: ObjectID) => {
+                                    return (
+                                        item.toString() === monitorId.toString()
+                                    );
+                                })
+                            ) {
+                                monitorsOnStatusPage.push(monitorId);
+                            }
+
+                            // add this to the timeline event for this group.
+
+                            if (
+                                shouldShowTimelineForThisGroup &&
+                                !monitorsOnStatusPageForTimeline.find(
+                                    (item: ObjectID) => {
+                                        return (
+                                            item.toString() ===
+                                            monitorId.toString()
+                                        );
+                                    }
+                                )
+                            ) {
+                                monitorsOnStatusPageForTimeline.push(monitorId);
+                            }
+                        }
+
+                        monitorsInGroup[monitorGroupId.toString()] =
+                            monitorsInGroupIds;
+                    }
 
                     let monitorStatusTimelines: Array<MonitorStatusTimeline> =
                         [];
@@ -553,7 +672,7 @@ export default class StatusPageAPI extends BaseAPI<
                                     createdAt: SortOrder.Ascending,
                                 },
                                 skip: 0,
-                                limit: LIMIT_PER_PROJECT,
+                                limit: LIMIT_MAX, // This can be optimized.
                                 props: {
                                     isRoot: true,
                                 },
@@ -563,6 +682,36 @@ export default class StatusPageAPI extends BaseAPI<
                     // check if status page has active incident.
                     let activeIncidents: Array<Incident> = [];
                     if (monitorsOnStatusPage.length > 0) {
+                        let select: Select<Incident> = {
+                            createdAt: true,
+                            title: true,
+                            description: true,
+                            _id: true,
+                            incidentSeverity: {
+                                name: true,
+                                color: true,
+                            },
+                            currentIncidentState: {
+                                _id: true,
+                                name: true,
+                                color: true,
+                                order: true,
+                            },
+                            monitors: {
+                                _id: true,
+                            },
+                        };
+
+                        if (statusPage.showIncidentLabelsOnStatusPage) {
+                            select = {
+                                ...select,
+                                labels: {
+                                    name: true,
+                                    color: true,
+                                },
+                            };
+                        }
+
                         activeIncidents = await IncidentService.findBy({
                             query: {
                                 monitors: monitorsOnStatusPage as any,
@@ -571,23 +720,7 @@ export default class StatusPageAPI extends BaseAPI<
                                 } as any,
                                 projectId: statusPage.projectId!,
                             },
-                            select: {
-                                createdAt: true,
-                                title: true,
-                                description: true,
-                                _id: true,
-                                incidentSeverity: {
-                                    name: true,
-                                    color: true,
-                                },
-                                currentIncidentState: {
-                                    name: true,
-                                    color: true,
-                                },
-                                monitors: {
-                                    _id: true,
-                                },
-                            },
+                            select: select,
                             sort: {
                                 createdAt: SortOrder.Ascending,
                             },
@@ -699,6 +832,35 @@ export default class StatusPageAPI extends BaseAPI<
 
                     // check if status page has active scheduled events.
 
+                    let scheduledEventsSelect: Select<ScheduledMaintenance> = {
+                        createdAt: true,
+                        title: true,
+                        description: true,
+                        _id: true,
+                        endsAt: true,
+                        startsAt: true,
+                        currentScheduledMaintenanceState: {
+                            name: true,
+                            color: true,
+                            isScheduledState: true,
+                            isResolvedState: true,
+                            isOngoingState: true,
+                        },
+                        monitors: {
+                            _id: true,
+                        },
+                    };
+
+                    if (statusPage.showScheduledEventLabelsOnStatusPage) {
+                        scheduledEventsSelect = {
+                            ...scheduledEventsSelect,
+                            labels: {
+                                name: true,
+                                color: true,
+                            },
+                        };
+                    }
+
                     const scheduledMaintenanceEvents: Array<ScheduledMaintenance> =
                         await ScheduledMaintenanceService.findBy({
                             query: {
@@ -708,24 +870,7 @@ export default class StatusPageAPI extends BaseAPI<
                                 statusPages: objectId as any,
                                 projectId: statusPage.projectId!,
                             },
-                            select: {
-                                createdAt: true,
-                                title: true,
-                                description: true,
-                                _id: true,
-                                endsAt: true,
-                                startsAt: true,
-                                currentScheduledMaintenanceState: {
-                                    name: true,
-                                    color: true,
-                                    isScheduledState: true,
-                                    isResolvedState: true,
-                                    isOngoingState: true,
-                                },
-                                monitors: {
-                                    _id: true,
-                                },
-                            },
+                            select: scheduledEventsSelect,
                             sort: {
                                 createdAt: SortOrder.Ascending,
                             },
@@ -746,24 +891,7 @@ export default class StatusPageAPI extends BaseAPI<
                                 statusPages: objectId as any,
                                 projectId: statusPage.projectId!,
                             },
-                            select: {
-                                createdAt: true,
-                                title: true,
-                                description: true,
-                                _id: true,
-                                endsAt: true,
-                                startsAt: true,
-                                currentScheduledMaintenanceState: {
-                                    name: true,
-                                    color: true,
-                                    isScheduledState: true,
-                                    isResolvedState: true,
-                                    isOngoingState: true,
-                                },
-                                monitors: {
-                                    _id: true,
-                                },
-                            },
+                            select: scheduledEventsSelect,
                             sort: {
                                 createdAt: SortOrder.Ascending,
                             },
@@ -906,6 +1034,12 @@ export default class StatusPageAPI extends BaseAPI<
                                 scheduledMaintenanceStateTimelines,
                                 ScheduledMaintenanceStateTimeline
                             ),
+
+                        monitorGroupCurrentStatuses: JSONFunctions.serialize(
+                            monitorGroupCurrentStatuses
+                        ),
+                        monitorsInGroup:
+                            JSONFunctions.serialize(monitorsInGroup),
                     };
 
                     return Response.sendJsonObjectResponse(req, res, response);
@@ -937,8 +1071,8 @@ export default class StatusPageAPI extends BaseAPI<
                             req
                         ))
                     ) {
-                        throw new NotAuthorizedException(
-                            'You are not authorized to access this status page'
+                        throw new NotAuthenticatedException(
+                            'You are not authenticated to access this status page'
                         );
                     }
 
@@ -1187,8 +1321,8 @@ export default class StatusPageAPI extends BaseAPI<
         req: ExpressRequest
     ): Promise<JSONObject> {
         if (!(await this.service.hasReadAccess(statusPageId, props, req))) {
-            throw new NotAuthorizedException(
-                'You are not authorized to access this status page'
+            throw new NotAuthenticatedException(
+                'You are not authenticated to access this status page'
             );
         }
 
@@ -1201,6 +1335,7 @@ export default class StatusPageAPI extends BaseAPI<
                     _id: true,
                     projectId: true,
                     showScheduledEventHistoryInDays: true,
+                    showScheduledEventLabelsOnStatusPage: true,
                 },
                 props: {
                     isRoot: true,
@@ -1228,6 +1363,7 @@ export default class StatusPageAPI extends BaseAPI<
                         _id: true,
                         currentMonitorStatusId: true,
                     },
+                    monitorGroupId: true,
                 },
 
                 skip: 0,
@@ -1257,27 +1393,40 @@ export default class StatusPageAPI extends BaseAPI<
             };
         }
 
+        let scheduledEventsSelect: Select<ScheduledMaintenance> = {
+            createdAt: true,
+            title: true,
+            description: true,
+            _id: true,
+            endsAt: true,
+            startsAt: true,
+            currentScheduledMaintenanceState: {
+                name: true,
+                color: true,
+                isScheduledState: true,
+                isResolvedState: true,
+                isOngoingState: true,
+                order: true,
+            },
+            monitors: {
+                _id: true,
+            },
+        };
+
+        if (statusPage.showScheduledEventLabelsOnStatusPage) {
+            scheduledEventsSelect = {
+                ...scheduledEventsSelect,
+                labels: {
+                    name: true,
+                    color: true,
+                },
+            };
+        }
+
         const scheduledMaintenanceEvents: Array<ScheduledMaintenance> =
             await ScheduledMaintenanceService.findBy({
                 query: query,
-                select: {
-                    createdAt: true,
-                    title: true,
-                    description: true,
-                    _id: true,
-                    endsAt: true,
-                    startsAt: true,
-                    currentScheduledMaintenanceState: {
-                        name: true,
-                        color: true,
-                        isScheduledState: true,
-                        isResolvedState: true,
-                        isOngoingState: true,
-                    },
-                    monitors: {
-                        _id: true,
-                    },
-                },
+                select: scheduledEventsSelect,
                 sort: {
                     startsAt: SortOrder.Descending,
                 },
@@ -1289,48 +1438,36 @@ export default class StatusPageAPI extends BaseAPI<
                 },
             });
 
-        const futureScheduledMaintenanceEvents: Array<ScheduledMaintenance> =
-            await ScheduledMaintenanceService.findBy({
-                query: {
-                    currentScheduledMaintenanceState: {
-                        isScheduledState: true,
-                    } as any,
-                    statusPages: [statusPageId] as any,
-                    projectId: statusPage.projectId!,
-                },
-                select: {
-                    createdAt: true,
-                    title: true,
-                    description: true,
-                    _id: true,
-                    endsAt: true,
-                    startsAt: true,
-                    currentScheduledMaintenanceState: {
-                        name: true,
-                        color: true,
-                        isScheduledState: true,
-                        isResolvedState: true,
-                        isOngoingState: true,
-                    },
-                    monitors: {
-                        _id: true,
-                    },
-                },
-                sort: {
-                    createdAt: SortOrder.Ascending,
-                },
-                skip: 0,
-                limit: LIMIT_PER_PROJECT,
-                props: {
-                    isRoot: true,
-                },
-            });
+        let futureScheduledMaintenanceEvents: Array<ScheduledMaintenance> = [];
 
-        futureScheduledMaintenanceEvents.forEach(
-            (event: ScheduledMaintenance) => {
-                scheduledMaintenanceEvents.push(event);
-            }
-        );
+        // If there is no scheduledMaintenanceId, then fetch all future scheduled events.
+        if (!scheduledMaintenanceId) {
+            futureScheduledMaintenanceEvents =
+                await ScheduledMaintenanceService.findBy({
+                    query: {
+                        currentScheduledMaintenanceState: {
+                            isScheduledState: true,
+                        } as any,
+                        statusPages: [statusPageId] as any,
+                        projectId: statusPage.projectId!,
+                    },
+                    select: scheduledEventsSelect,
+                    sort: {
+                        createdAt: SortOrder.Ascending,
+                    },
+                    skip: 0,
+                    limit: LIMIT_PER_PROJECT,
+                    props: {
+                        isRoot: true,
+                    },
+                });
+
+            futureScheduledMaintenanceEvents.forEach(
+                (event: ScheduledMaintenance) => {
+                    scheduledMaintenanceEvents.push(event);
+                }
+            );
+        }
 
         const scheduledMaintenanceEventsOnStatusPage: Array<ObjectID> =
             scheduledMaintenanceEvents.map((event: ScheduledMaintenance) => {
@@ -1401,10 +1538,93 @@ export default class StatusPageAPI extends BaseAPI<
                 });
         }
 
+        const monitorGroupIds: Array<ObjectID> = statusPageResources
+            .map((resource: StatusPageResource) => {
+                return resource.monitorGroupId!;
+            })
+            .filter((id: ObjectID) => {
+                return Boolean(id); // remove nulls
+            });
+
+        // get monitors in the group.
+        const monitorsInGroup: Dictionary<Array<ObjectID>> = {};
+
+        // get monitor status charts.
+        const monitorsOnStatusPage: Array<ObjectID> = statusPageResources
+            .map((monitor: StatusPageResource) => {
+                return monitor.monitorId!;
+            })
+            .filter((id: ObjectID) => {
+                return Boolean(id); // remove nulls
+            });
+
+        for (const monitorGroupId of monitorGroupIds) {
+            // get monitors in the group.
+
+            const groupResources: Array<MonitorGroupResource> =
+                await MonitorGroupResourceService.findBy({
+                    query: {
+                        monitorGroupId: monitorGroupId,
+                    },
+                    select: {
+                        monitorId: true,
+                    },
+                    props: {
+                        isRoot: true,
+                    },
+                    limit: LIMIT_PER_PROJECT,
+                    skip: 0,
+                });
+
+            const monitorsInGroupIds: Array<ObjectID> = groupResources
+                .map((resource: MonitorGroupResource) => {
+                    return resource.monitorId!;
+                })
+                .filter((id: ObjectID) => {
+                    return Boolean(id); // remove nulls
+                });
+
+            for (const monitorId of monitorsInGroupIds) {
+                if (
+                    !monitorsOnStatusPage.find((item: ObjectID) => {
+                        return item.toString() === monitorId.toString();
+                    })
+                ) {
+                    monitorsOnStatusPage.push(monitorId);
+                }
+            }
+
+            monitorsInGroup[monitorGroupId.toString()] = monitorsInGroupIds;
+        }
+
+        // get scheduled event states.
+        const scheduledEventStates: Array<ScheduledMaintenanceState> =
+            await ScheduledMaintenanceStateService.findBy({
+                query: {
+                    projectId: statusPage.projectId!,
+                },
+                limit: LIMIT_PER_PROJECT,
+                skip: 0,
+                props: {
+                    isRoot: true,
+                },
+                select: {
+                    _id: true,
+                    order: true,
+                    isEndedState: true,
+                    isOngoingState: true,
+                    isScheduledState: true,
+                },
+            });
+
         const response: JSONObject = {
             scheduledMaintenanceEventsPublicNotes: JSONFunctions.toJSONArray(
                 scheduledMaintenanceEventsPublicNotes,
                 ScheduledMaintenancePublicNote
+            ),
+            scheduledMaintenanceStates: JSONFunctions.toJSONArray(
+                scheduledEventStates,
+                ScheduledMaintenanceState
             ),
             scheduledMaintenanceEvents: JSONFunctions.toJSONArray(
                 scheduledMaintenanceEvents,
@@ -1418,6 +1638,7 @@ export default class StatusPageAPI extends BaseAPI<
                 scheduledMaintenanceStateTimelines,
                 ScheduledMaintenanceStateTimeline
             ),
+            monitorsInGroup: JSONFunctions.serialize(monitorsInGroup),
         };
 
         return response;
@@ -1430,8 +1651,8 @@ export default class StatusPageAPI extends BaseAPI<
         req: ExpressRequest
     ): Promise<JSONObject> {
         if (!(await this.service.hasReadAccess(statusPageId, props, req))) {
-            throw new NotAuthorizedException(
-                'You are not authorized to access this status page'
+            throw new NotAuthenticatedException(
+                'You are not authenticated to access this status page'
             );
         }
 
@@ -1540,8 +1761,8 @@ export default class StatusPageAPI extends BaseAPI<
         req: ExpressRequest
     ): Promise<JSONObject> {
         if (!(await this.service.hasReadAccess(statusPageId, props, req))) {
-            throw new NotAuthorizedException(
-                'You are not authorized to access this status page'
+            throw new NotAuthenticatedException(
+                'You are not authenticated to access this status page'
             );
         }
 
@@ -1554,6 +1775,7 @@ export default class StatusPageAPI extends BaseAPI<
                     _id: true,
                     projectId: true,
                     showIncidentHistoryInDays: true,
+                    showIncidentLabelsOnStatusPage: true,
                 },
                 props: {
                     isRoot: true,
@@ -1581,6 +1803,7 @@ export default class StatusPageAPI extends BaseAPI<
                         _id: true,
                         currentMonitorStatusId: true,
                     },
+                    monitorGroupId: true,
                 },
 
                 skip: 0,
@@ -1590,12 +1813,65 @@ export default class StatusPageAPI extends BaseAPI<
                 },
             });
 
+        const monitorGroupIds: Array<ObjectID> = statusPageResources
+            .map((resource: StatusPageResource) => {
+                return resource.monitorGroupId!;
+            })
+            .filter((id: ObjectID) => {
+                return Boolean(id); // remove nulls
+            });
+
+        const monitorsInGroup: Dictionary<Array<ObjectID>> = {};
+
         // get monitor status charts.
-        const monitorsOnStatusPage: Array<ObjectID> = statusPageResources.map(
-            (monitor: StatusPageResource) => {
+        const monitorsOnStatusPage: Array<ObjectID> = statusPageResources
+            .map((monitor: StatusPageResource) => {
                 return monitor.monitorId!;
+            })
+            .filter((id: ObjectID) => {
+                return Boolean(id); // remove nulls
+            });
+
+        for (const monitorGroupId of monitorGroupIds) {
+            // get current status of monitors in the group.
+
+            // get monitors in the group.
+
+            const groupResources: Array<MonitorGroupResource> =
+                await MonitorGroupResourceService.findBy({
+                    query: {
+                        monitorGroupId: monitorGroupId,
+                    },
+                    select: {
+                        monitorId: true,
+                    },
+                    props: {
+                        isRoot: true,
+                    },
+                    limit: LIMIT_PER_PROJECT,
+                    skip: 0,
+                });
+
+            const monitorsInGroupIds: Array<ObjectID> = groupResources
+                .map((resource: MonitorGroupResource) => {
+                    return resource.monitorId!;
+                })
+                .filter((id: ObjectID) => {
+                    return Boolean(id); // remove nulls
+                });
+
+            for (const monitorId of monitorsInGroupIds) {
+                if (
+                    !monitorsOnStatusPage.find((item: ObjectID) => {
+                        return item.toString() === monitorId.toString();
+                    })
+                ) {
+                    monitorsOnStatusPage.push(monitorId);
+                }
             }
-        );
+
+            monitorsInGroup[monitorGroupId.toString()] = monitorsInGroupIds;
+        }
 
         const today: Date = OneUptimeDate.getCurrentDate();
         const historyDays: Date = OneUptimeDate.getSomeDaysAgo(
@@ -1618,26 +1894,41 @@ export default class StatusPageAPI extends BaseAPI<
 
         // check if status page has active incident.
         let incidents: Array<Incident> = [];
+
+        let selectIncidents: Select<Incident> = {
+            createdAt: true,
+            title: true,
+            description: true,
+            _id: true,
+            incidentSeverity: {
+                name: true,
+                color: true,
+            },
+            currentIncidentState: {
+                name: true,
+                color: true,
+                _id: true,
+                order: true,
+            },
+            monitors: {
+                _id: true,
+            },
+        };
+
+        if (statusPage.showIncidentLabelsOnStatusPage) {
+            selectIncidents = {
+                ...selectIncidents,
+                labels: {
+                    name: true,
+                    color: true,
+                },
+            };
+        }
+
         if (monitorsOnStatusPage.length > 0) {
             incidents = await IncidentService.findBy({
                 query: incidentQuery,
-                select: {
-                    createdAt: true,
-                    title: true,
-                    description: true,
-                    _id: true,
-                    incidentSeverity: {
-                        name: true,
-                        color: true,
-                    },
-                    currentIncidentState: {
-                        name: true,
-                        color: true,
-                    },
-                    monitors: {
-                        _id: true,
-                    },
-                },
+                select: selectIncidents,
                 sort: {
                     createdAt: SortOrder.Descending,
                 },
@@ -1648,8 +1939,11 @@ export default class StatusPageAPI extends BaseAPI<
                 },
             });
 
-            const activeIncidents: Array<Incident> =
-                await IncidentService.findBy({
+            let activeIncidents: Array<Incident> = [];
+
+            // If there is no particular incident id to fetch then fetch active incidents.
+            if (!incidentId) {
+                activeIncidents = await IncidentService.findBy({
                     query: {
                         monitors: monitorsOnStatusPage as any,
                         currentIncidentState: {
@@ -1657,23 +1951,7 @@ export default class StatusPageAPI extends BaseAPI<
                         } as any,
                         projectId: statusPage.projectId!,
                     },
-                    select: {
-                        createdAt: true,
-                        title: true,
-                        description: true,
-                        _id: true,
-                        incidentSeverity: {
-                            name: true,
-                            color: true,
-                        },
-                        currentIncidentState: {
-                            name: true,
-                            color: true,
-                        },
-                        monitors: {
-                            _id: true,
-                        },
-                    },
+                    select: selectIncidents,
                     sort: {
                         createdAt: SortOrder.Descending,
                     },
@@ -1684,6 +1962,7 @@ export default class StatusPageAPI extends BaseAPI<
                         isRoot: true,
                     },
                 });
+            }
 
             incidents = [...activeIncidents, ...incidents];
 
@@ -1751,10 +2030,31 @@ export default class StatusPageAPI extends BaseAPI<
             });
         }
 
+        // get all the incident states for this project.
+        const incidentStates: Array<IncidentState> =
+            await IncidentStateService.findBy({
+                query: {
+                    projectId: statusPage.projectId!,
+                },
+                select: {
+                    isResolvedState: true,
+                    order: true,
+                },
+                limit: LIMIT_PER_PROJECT,
+                skip: 0,
+                props: {
+                    isRoot: true,
+                },
+            });
+
         const response: JSONObject = {
             incidentPublicNotes: JSONFunctions.toJSONArray(
                 incidentPublicNotes,
                 IncidentPublicNote
+            ),
+            incidentStates: JSONFunctions.toJSONArray(
+                incidentStates,
+                IncidentState
             ),
             incidents: JSONFunctions.toJSONArray(incidents, Incident),
             statusPageResources: JSONFunctions.toJSONArray(
@@ -1765,6 +2065,7 @@ export default class StatusPageAPI extends BaseAPI<
                 incidentStateTimelines,
                 IncidentStateTimeline
             ),
+            monitorsInGroup: JSONFunctions.serialize(monitorsInGroup),
         };
 
         return response;

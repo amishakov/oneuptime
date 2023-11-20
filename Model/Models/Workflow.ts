@@ -30,7 +30,7 @@ import Label from './Label';
 import AccessControlColumn from 'Common/Types/Database/AccessControlColumn';
 import TableBillingAccessControl from 'Common/Types/Database/AccessControl/TableBillingAccessControl';
 import { PlanSelect } from 'Common/Types/Billing/SubscriptionPlan';
-import EnableDocumentation from 'Common/Types/Model/EnableDocumentation';
+import EnableDocumentation from 'Common/Types/Database/EnableDocumentation';
 
 @EnableDocumentation()
 @TableBillingAccessControl({
@@ -46,6 +46,7 @@ import EnableDocumentation from 'Common/Types/Model/EnableDocumentation';
         Permission.ProjectOwner,
         Permission.ProjectAdmin,
         Permission.CanCreateWorkflow,
+        Permission.ProjectMember,
     ],
     read: [
         Permission.ProjectOwner,
@@ -57,10 +58,12 @@ import EnableDocumentation from 'Common/Types/Model/EnableDocumentation';
         Permission.ProjectOwner,
         Permission.ProjectAdmin,
         Permission.CanDeleteWorkflow,
+        Permission.ProjectMember,
     ],
     update: [
         Permission.ProjectOwner,
         Permission.ProjectAdmin,
+        Permission.CanDeleteWorkflow,
         Permission.CanEditWorkflow,
     ],
 })
@@ -83,6 +86,7 @@ export default class Workflow extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.CanCreateWorkflow,
+            Permission.ProjectMember,
         ],
         read: [
             Permission.ProjectOwner,
@@ -119,6 +123,7 @@ export default class Workflow extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.CanCreateWorkflow,
+            Permission.ProjectMember,
         ],
         read: [
             Permission.ProjectOwner,
@@ -149,6 +154,7 @@ export default class Workflow extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.CanCreateWorkflow,
+            Permission.ProjectMember,
         ],
         read: [
             Permission.ProjectOwner,
@@ -159,6 +165,7 @@ export default class Workflow extends BaseModel {
         update: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.CanDeleteWorkflow,
             Permission.CanEditWorkflow,
         ],
     })
@@ -206,6 +213,7 @@ export default class Workflow extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.CanCreateWorkflow,
+            Permission.ProjectMember,
         ],
         read: [
             Permission.ProjectOwner,
@@ -216,6 +224,7 @@ export default class Workflow extends BaseModel {
         update: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.CanDeleteWorkflow,
             Permission.CanEditWorkflow,
         ],
     })
@@ -237,6 +246,7 @@ export default class Workflow extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.CanCreateWorkflow,
+            Permission.ProjectMember,
         ],
         read: [
             Permission.ProjectOwner,
@@ -273,6 +283,7 @@ export default class Workflow extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.CanCreateWorkflow,
+            Permission.ProjectMember,
         ],
         read: [
             Permission.ProjectOwner,
@@ -355,6 +366,7 @@ export default class Workflow extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.CanCreateWorkflow,
+            Permission.ProjectMember,
         ],
         read: [
             Permission.ProjectOwner,
@@ -365,6 +377,7 @@ export default class Workflow extends BaseModel {
         update: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.CanDeleteWorkflow,
             Permission.CanEditWorkflow,
         ],
     })
@@ -385,6 +398,7 @@ export default class Workflow extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.CanCreateWorkflow,
+            Permission.ProjectMember,
         ],
         read: [
             Permission.ProjectOwner,
@@ -395,6 +409,7 @@ export default class Workflow extends BaseModel {
         update: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.CanDeleteWorkflow,
             Permission.CanEditWorkflow,
         ],
     })
@@ -417,6 +432,7 @@ export default class Workflow extends BaseModel {
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
             Permission.CanCreateWorkflow,
+            Permission.ProjectMember,
         ],
         read: [
             Permission.ProjectOwner,
@@ -427,6 +443,7 @@ export default class Workflow extends BaseModel {
         update: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.CanDeleteWorkflow,
             Permission.CanEditWorkflow,
         ],
     })

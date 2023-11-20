@@ -59,7 +59,7 @@ const FilePicker: FunctionComponent<ComponentProps> = (
         setInitialValue();
     }, [props.initialValue]);
 
-    const setInitialValue: Function = () => {
+    const setInitialValue: () => void = () => {
         if (
             Array.isArray(props.initialValue) &&
             props.initialValue &&
@@ -223,7 +223,7 @@ const FilePicker: FunctionComponent<ComponentProps> = (
 
                                     <input
                                         tabIndex={props.tabIndex}
-                                        {...getInputProps()}
+                                        {...(getInputProps() as any)}
                                         id="file-upload"
                                         name="file-upload"
                                         type="file"

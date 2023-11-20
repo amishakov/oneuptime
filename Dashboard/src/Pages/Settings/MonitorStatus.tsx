@@ -14,9 +14,8 @@ import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSc
 import { JSONObject } from 'Common/Types/JSON';
 import StatusBubble from 'CommonUI/src/Components/StatusBubble/StatusBubble';
 import Color from 'Common/Types/Color';
-import IconProp from 'Common/Types/Icon/IconProp';
 import BadDataException from 'Common/Types/Exception/BadDataException';
-import SortOrder from 'Common/Types/Database/SortOrder';
+import SortOrder from 'Common/Types/BaseDatabase/SortOrder';
 import DashboardNavigation from '../../Utils/Navigation';
 import Navigation from 'CommonUI/src/Utils/Navigation';
 import ObjectID from 'Common/Types/ObjectID';
@@ -59,7 +58,6 @@ const Monitors: FunctionComponent<PageComponentProps> = (
                 isEditable={true}
                 isCreateable={true}
                 cardProps={{
-                    icon: IconProp.AltGlobe,
                     title: 'Monitor Status',
                     description:
                         'Define different status types (eg: Operational, Degraded, Down) here.',
@@ -71,7 +69,9 @@ const Monitors: FunctionComponent<PageComponentProps> = (
                     orderField: 'priority',
                 }}
                 showTableAs={ShowTableAs.OrderedStatesList}
-                onBeforeDelete={(item: MonitorStatus) => {
+                onBeforeDelete={(
+                    item: MonitorStatus
+                ): Promise<MonitorStatus> => {
                     if (item.isOperationalState) {
                         throw new BadDataException(
                             'This monitor status cannot be deleted because its the operational state of monitors. Operational status or Offline Status cannot be deleted.'
@@ -84,7 +84,7 @@ const Monitors: FunctionComponent<PageComponentProps> = (
                         );
                     }
 
-                    return item;
+                    return Promise.resolve(item);
                 }}
                 viewPageRoute={Navigation.getCurrentRoute()}
                 onBeforeCreate={(
@@ -153,6 +153,7 @@ const Monitors: FunctionComponent<PageComponentProps> = (
                                 <StatusBubble
                                     color={item['color'] as Color}
                                     text={item['name'] as string}
+                                    shouldAnimate={false}
                                 />
                             );
                         },

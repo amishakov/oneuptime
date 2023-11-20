@@ -1,6 +1,6 @@
-import React, { FunctionComponent, ReactElement } from 'react';
+import React, { ReactElement } from 'react';
 
-const NoEventDay: FunctionComponent = (): ReactElement => {
+const NoEventDay: () => JSX.Element = (): ReactElement => {
     return (
         <div
             className="flex bottom-grey-border"

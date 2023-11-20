@@ -10,12 +10,11 @@ import Probe from 'Model/Models/Probe';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
 import { JSONObject } from 'Common/Types/JSON';
-import IconProp from 'Common/Types/Icon/IconProp';
 import DashboardNavigation from '../../Utils/Navigation';
 import Navigation from 'CommonUI/src/Utils/Navigation';
 import ConfirmModal from 'CommonUI/src/Components/Modal/ConfirmModal';
 import { ButtonStyleType } from 'CommonUI/src/Components/Button/Button';
-import ProbeElement from '../../Components/Probe/Probe';
+import ProbeElement from 'CommonUI/src/Components/Probe/Probe';
 import Statusbubble from 'CommonUI/src/Components/StatusBubble/StatusBubble';
 import { Green, Red } from 'Common/Types/BrandColors';
 import OneUptimeDate from 'Common/Types/Date';
@@ -64,7 +63,6 @@ const ProbePage: FunctionComponent<PageComponentProps> = (
                     isEditable={false}
                     isCreateable={false}
                     cardProps={{
-                        icon: IconProp.Signal,
                         title: 'Global Probes',
                         description:
                             'Global Probes help you monitor external resources from different locations around the world.',
@@ -119,6 +117,7 @@ const ProbePage: FunctionComponent<PageComponentProps> = (
                                         <Statusbubble
                                             text={'Connected'}
                                             color={Green}
+                                            shouldAnimate={true}
                                         />
                                     );
                                 }
@@ -127,6 +126,7 @@ const ProbePage: FunctionComponent<PageComponentProps> = (
                                     <Statusbubble
                                         text={'Disconnected'}
                                         color={Red}
+                                        shouldAnimate={false}
                                     />
                                 );
                             },
@@ -155,7 +155,6 @@ const ProbePage: FunctionComponent<PageComponentProps> = (
                     isEditable={true}
                     isCreateable={true}
                     cardProps={{
-                        icon: IconProp.Signal,
                         title: 'Custom Probes',
                         description:
                             'Custom Probes help you monitor internal resources that is behind your firewall.',
@@ -282,6 +281,7 @@ const ProbePage: FunctionComponent<PageComponentProps> = (
                                         <Statusbubble
                                             text={'Connected'}
                                             color={Green}
+                                            shouldAnimate={true}
                                         />
                                     );
                                 }
@@ -290,6 +290,7 @@ const ProbePage: FunctionComponent<PageComponentProps> = (
                                     <Statusbubble
                                         text={'Disconnected'}
                                         color={Red}
+                                        shouldAnimate={false}
                                     />
                                 );
                             },

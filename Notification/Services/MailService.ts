@@ -14,8 +14,20 @@ import Hostname from 'Common/Types/API/Hostname';
 import Port from 'Common/Types/Port';
 import { JSONObject } from 'Common/Types/JSON';
 import logger from 'CommonServer/Utils/Logger';
-import { IsDevelopment } from 'CommonServer/Config';
-import { SendGridApiKey } from '../Config';
+import { IsDevelopment } from 'CommonServer/EnvironmentConfig';
+import {
+    InternalSmtpEmail,
+    InternalSmtpFromName,
+    InternalSmtpHost,
+    InternalSmtpPassword,
+    InternalSmtpPort,
+    InternalSmtpSecure,
+    InternalSmtpUsername,
+    getEmailServerType,
+    getGlobalSMTPConfig,
+    SendGridConfig,
+    getSendgridConfig,
+} from '../Config';
 import SendgridMail, { MailDataRequired } from '@sendgrid/mail';
 import ObjectID from 'Common/Types/ObjectID';
 import UserOnCallLogTimelineService from 'CommonServer/Services/UserOnCallLogTimelineService';
@@ -23,6 +35,7 @@ import UserNotificationStatus from 'Common/Types/UserNotification/UserNotificati
 import EmailLog from 'Model/Models/EmailLog';
 import MailStatus from 'Common/Types/Mail/MailStatus';
 import EmailLogService from 'CommonServer/Services/EmailLogService';
+import { EmailServerType } from 'Model/Models/GlobalConfig';
 
 export default class MailService {
     public static isSMTPConfigValid(obj: JSONObject): boolean {
@@ -92,25 +105,44 @@ export default class MailService {
                 obj && obj['SMTP_ID']
                     ? new ObjectID(obj['SMTP_ID'].toString())
                     : undefined,
-            username: obj['SMTP_USERNAME']?.toString()!,
-            password: obj['SMTP_PASSWORD']?.toString()!,
-            host: new Hostname(obj['SMTP_HOST']?.toString()!),
-            port: new Port(obj['SMTP_PORT']?.toString()!),
-            fromEmail: new Email(obj['SMTP_EMAIL']?.toString()!),
-            fromName: obj['SMTP_FROM_NAME']?.toString()!,
+            username: obj['SMTP_USERNAME']?.toString() || undefined,
+            password: obj['SMTP_PASSWORD']?.toString() || undefined,
+            host: new Hostname(obj['SMTP_HOST']?.toString() as string),
+            port: new Port(obj['SMTP_PORT']?.toString() as string),
+            fromEmail: new Email(obj['SMTP_EMAIL']?.toString() as string),
+            fromName: obj['SMTP_FROM_NAME']?.toString() as string,
             secure:
                 obj['SMTP_IS_SECURE'] === 'true' ||
                 obj['SMTP_IS_SECURE'] === true,
         };
     }
 
-    public static getGlobalFromEmail(): Email {
-        const emailServer: EmailServer = this.getGlobalSmtpSettings();
+    public static getInternalEmailServer(): EmailServer {
+        return {
+            id: undefined,
+            username: InternalSmtpUsername,
+            password: InternalSmtpPassword,
+            host: InternalSmtpHost,
+            port: InternalSmtpPort,
+            fromEmail: InternalSmtpEmail,
+            fromName: InternalSmtpFromName,
+            secure: InternalSmtpSecure,
+        };
+    }
+
+    public static async getGlobalFromEmail(): Promise<Email> {
+        const emailServer: EmailServer | null =
+            await this.getGlobalSmtpSettings();
+
+        if (!emailServer) {
+            throw new BadDataException('Global SMTP Config not found');
+        }
+
         return emailServer.fromEmail;
     }
 
-    private static getGlobalSmtpSettings(): EmailServer {
-        return this.getEmailServer(process.env);
+    private static async getGlobalSmtpSettings(): Promise<EmailServer | null> {
+        return await getGlobalSMTPConfig();
     }
 
     private static async updateUserNotificationLogTimelineAsSent(
@@ -176,15 +208,24 @@ export default class MailService {
         return subjectHandlebars(vars).toString();
     }
 
-    private static createMailer(emailServer: EmailServer): Transporter {
+    private static createMailer(
+        emailServer: EmailServer,
+        options: {
+            timeout?: number | undefined;
+        }
+    ): Transporter {
         const privateMailer: Transporter = nodemailer.createTransport({
             host: emailServer.host.toString(),
             port: emailServer.port.toNumber(),
             secure: emailServer.secure,
-            auth: {
-                user: emailServer.username,
-                pass: emailServer.password,
-            },
+            auth:
+                emailServer.username && emailServer.password
+                    ? {
+                          user: emailServer.username,
+                          pass: emailServer.password,
+                      }
+                    : undefined,
+            connectionTimeout: options.timeout || undefined,
         });
 
         return privateMailer;
@@ -195,9 +236,12 @@ export default class MailService {
         options: {
             emailServer: EmailServer;
             projectId?: ObjectID | undefined;
+            timeout?: number | undefined;
         }
     ): Promise<void> {
-        const mailer: Transporter = this.createMailer(options.emailServer);
+        const mailer: Transporter = this.createMailer(options.emailServer, {
+            timeout: options.timeout,
+        });
         await mailer.sendMail({
             from: `${options.emailServer.fromName.toString()} <${options.emailServer.fromEmail.toString()}>`,
             to: mail.toEmail.toString(),
@@ -213,6 +257,7 @@ export default class MailService {
                   projectId?: ObjectID | undefined;
                   emailServer?: EmailServer | undefined;
                   userOnCallLogTimelineId?: ObjectID | undefined;
+                  timeout?: number | undefined;
               }
             | undefined
     ): Promise<void> {
@@ -242,19 +287,104 @@ export default class MailService {
             ? await this.compileEmailBody(mail.templateType, mail.vars)
             : this.compileText(mail.body || '', mail.vars);
         mail.subject = this.compileText(mail.subject, mail.vars);
+
+        const emailServerType: EmailServerType = await getEmailServerType();
+
         try {
-            if ((!options || !options.emailServer) && SendGridApiKey) {
-                SendgridMail.setApiKey(SendGridApiKey);
+            if (
+                (!options || !options.emailServer) &&
+                emailServerType === EmailServerType.Sendgrid
+            ) {
+                const sendgridConfig: SendGridConfig | null =
+                    await getSendgridConfig();
+
+                if (!sendgridConfig) {
+                    if (emailLog) {
+                        emailLog.status = MailStatus.Error;
+                        emailLog.statusMessage =
+                            'Email is configured to use Sendgrid, but Sendgrid Settings is not configured.';
+
+                        await EmailLogService.create({
+                            data: emailLog,
+                            props: {
+                                isRoot: true,
+                            },
+                        });
+                    }
+
+                    throw new BadDataException('Sendgrid Config not found');
+                }
+
+                if (!sendgridConfig.apiKey) {
+                    if (emailLog) {
+                        emailLog.status = MailStatus.Error;
+                        emailLog.statusMessage =
+                            'Email is configured to use Sendgrid, but Sendgrid API key is not configured.';
+
+                        await EmailLogService.create({
+                            data: emailLog,
+                            props: {
+                                isRoot: true,
+                            },
+                        });
+                    }
+
+                    throw new BadDataException(
+                        'Sendgrid API key not configured'
+                    );
+                }
+
+                if (!sendgridConfig.fromEmail) {
+                    if (emailLog) {
+                        emailLog.status = MailStatus.Error;
+                        emailLog.statusMessage =
+                            'Email is configured to use Sendgrid, but Sendgrid From Email is not configured.';
+
+                        await EmailLogService.create({
+                            data: emailLog,
+                            props: {
+                                isRoot: true,
+                            },
+                        });
+                    }
+
+                    throw new BadDataException(
+                        'Sendgrid From Email not configured'
+                    );
+                }
+
+                if (!sendgridConfig.fromName) {
+                    if (emailLog) {
+                        emailLog.status = MailStatus.Error;
+                        emailLog.statusMessage =
+                            'Email is configured to use Sendgrid, but Sendgrid From Name is not configured.';
+
+                        await EmailLogService.create({
+                            data: emailLog,
+                            props: {
+                                isRoot: true,
+                            },
+                        });
+                    }
+
+                    throw new BadDataException(
+                        'Sendgrid From Name not configured'
+                    );
+                }
+
+                SendgridMail.setApiKey(sendgridConfig.apiKey);
 
                 const msg: MailDataRequired = {
                     to: mail.toEmail.toString(),
-                    from: this.getGlobalFromEmail().toString(),
+                    from: `${
+                        sendgridConfig.fromName || 'OneUptime'
+                    } <${sendgridConfig.fromEmail.toString()}>`,
                     subject: mail.subject,
                     html: mail.body,
                 };
 
                 if (emailLog) {
-                    emailLog.fromEmail = this.getGlobalFromEmail();
+                    emailLog.fromEmail = sendgridConfig.fromEmail;
                 }
 
                 await SendgridMail.send(msg);
@@ -280,20 +410,60 @@ export default class MailService {
                 return;
             }
 
-            if (!options || !options.emailServer) {
+            if (
+                (!options || !options.emailServer) &&
+                emailServerType === EmailServerType.CustomSMTP
+            ) {
                 if (!options) {
                     options = {};
                 }
-                options.emailServer = this.getGlobalSmtpSettings();
+
+                const globalEmailServer: EmailServer | null =
+                    await this.getGlobalSmtpSettings();
+
+                if (!globalEmailServer) {
+                    if (emailLog) {
+                        emailLog.status = MailStatus.Error;
+                        emailLog.statusMessage =
+                            'Email is configured to use SMTP, but SMTP settings are not configured.';
+
+                        await EmailLogService.create({
+                            data: emailLog,
+                            props: {
+                                isRoot: true,
+                            },
+                        });
+                    }
+
+                    throw new BadDataException('Global SMTP Config not found');
+                }
+
+                options.emailServer = globalEmailServer;
             }
 
-            if (options.emailServer && emailLog) {
+            if (
+                emailServerType === EmailServerType.Internal &&
+                (!options || !options.emailServer)
+            ) {
+                if (!options) {
+                    options = {};
+                }
+
+                options.emailServer = this.getInternalEmailServer();
+            }
+
+            if (options && options.emailServer && emailLog) {
                 emailLog.fromEmail = options.emailServer.fromEmail;
+            }
+
+            if (!options || !options.emailServer) {
+                throw new BadDataException('Email server not found');
             }
 
             await this.transportMail(mail, {
                 emailServer: options.emailServer,
                 projectId: options.projectId,
+                timeout: options.timeout,
             });
 
             if (emailLog) {

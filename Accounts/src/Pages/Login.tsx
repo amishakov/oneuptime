@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useState } from 'react';
+import React, { useState } from 'react';
 import User from 'Model/Models/User';
 import Route from 'Common/Types/API/Route';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
@@ -12,23 +12,29 @@ import LoginUtil from '../Utils/Login';
 import UserUtil from 'CommonUI/src/Utils/User';
 import Navigation from 'CommonUI/src/Utils/Navigation';
 import { DASHBOARD_URL } from 'CommonUI/src/Config';
+import Alert, { AlertType } from 'CommonUI/src/Components/Alerts/Alert';
+import UiAnalytics from 'CommonUI/src/Utils/Analytics';
 
-const LoginPage: FunctionComponent = () => {
+const LoginPage: () => JSX.Element = () => {
     const apiUrl: URL = LOGIN_API_URL;
 
     if (UserUtil.isLoggedIn()) {
         Navigation.navigate(DASHBOARD_URL);
     }
 
+    const showSsoMessage: boolean = Boolean(
+        Navigation.getQueryStringByName('sso')
+    );
+
     const [showSsoTip, setShowSSOTip] = useState<boolean>(false);
 
     return (
         <div className="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
-            <div className="sm:mx-auto sm:w-full sm:max-w-md">
+            <div className="">
                 <img
                     className="mx-auto h-12 w-auto"
                     src={OneUptimeLogo}
-                    alt="Your Company"
+                    alt="OneUptime"
                 />
                 <h2 className="mt-6 text-center text-2xl  tracking-tight text-gray-900">
                     Sign in to your account
@@ -38,6 +44,16 @@ const LoginPage: FunctionComponent = () => {
                     stay online all the time.
                 </p>
             </div>
+
+            {showSsoMessage && (
+                <div className="sm:mx-auto sm:w-full sm:max-w-md mt-8">
+                    {' '}
+                    <Alert
+                        type={AlertType.DANGER}
+                        title="You must be logged into OneUptime account to use single sign-on (SSO) for your project. Logging in to OneUptime account and single sign on (SSO) for your project are two separate steps. Please use the form below to log in to your OneUptime account before you use SSO."
+                    />{' '}
+                </div>
+            )}
 
             <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
                 <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
@@ -74,13 +90,24 @@ const LoginPage: FunctionComponent = () => {
                         apiUrl={apiUrl}
                         formType={FormType.Create}
                         submitButtonText={'Login'}
-                        onSuccess={(value: JSONObject) => {
-                            LoginUtil.login(value);
+                        onSuccess={(
+                            value: User,
+                            miscData: JSONObject | undefined
+                        ) => {
+                            if (value && value.email) {
+                                UiAnalytics.userAuth(value.email);
+                                UiAnalytics.capture('accounts/login');
+                            }
+
+                            LoginUtil.login({
+                                user: value,
+                                token: miscData ? miscData['token'] : undefined,
+                            });
                         }}
                         maxPrimaryButtonWidth={true}
                         footer={
                             <div className="actions pointer text-center mt-4 hover:underline fw-semibold">
-                                <p>
+                                <div>
                                     {!showSsoTip && (
                                         <div
                                             onClick={() => {
@@ -101,13 +128,13 @@ const LoginPage: FunctionComponent = () => {
                                             your project.
                                         </div>
                                     )}
-                                </p>
+                                </div>
                             </div>
                         }
                     />
                 </div>
                 <div className="mt-10 text-center">
-                    <p className="text-muted mb-0 text-gray-500">
+                    <div className="text-muted mb-0 text-gray-500">
                         Don&apos;t have an account?{' '}
                         <Link
                             to={new Route('/accounts/register')}
@@ -115,7 +142,7 @@ const LoginPage: FunctionComponent = () => {
                         >
                             Register.
                         </Link>
-                    </p>
+                    </div>
                 </div>
             </div>
         </div>

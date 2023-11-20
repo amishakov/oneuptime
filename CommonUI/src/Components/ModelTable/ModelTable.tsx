@@ -17,10 +17,9 @@ import { ButtonStyleType } from '../Button/Button';
 import ModelFormModal from '../ModelFormModal/ModelFormModal';
 
 import IconProp from 'Common/Types/Icon/IconProp';
-import { FormType } from '../Forms/ModelForm';
-import Fields from '../Forms/Types/Fields';
+import { FormType, ModelField } from '../Forms/ModelForm';
 
-import SortOrder from 'Common/Types/Database/SortOrder';
+import SortOrder from 'Common/Types/BaseDatabase/SortOrder';
 import FieldType from '../Types/FieldType';
 import Dictionary from 'Common/Types/Dictionary';
 import ActionButtonSchema from '../ActionButton/ActionButtonSchema';
@@ -31,7 +30,7 @@ import Permission, {
     UserPermission,
 } from 'Common/Types/Permission';
 import PermissionUtil from '../../Utils/Permission';
-import { ColumnAccessControl } from 'Common/Types/Database/AccessControl/AccessControl';
+import { ColumnAccessControl } from 'Common/Types/BaseDatabase/AccessControl';
 import Query from '../../Utils/ModelAPI/Query';
 import Search from 'Common/Types/Database/Search';
 import Typeof from 'Common/Types/Typeof';
@@ -62,6 +61,7 @@ import { DropdownOption } from '../Dropdown/Dropdown';
 import { FormStep } from '../Forms/Types/FormStep';
 import URL from 'Common/Types/API/URL';
 import { ListDetailProps } from '../List/ListRow';
+import User from '../../Utils/User';
 
 export enum ShowTableAs {
     Table,
@@ -79,15 +79,16 @@ export interface ComponentProps<TBaseModel extends BaseModel> {
         | undefined
         | ((data: Array<TBaseModel>, totalCount: number) => void);
     cardProps?: CardComponentProps | undefined;
+    showCreateForm?: undefined | boolean;
     columns: Columns<TBaseModel>;
     listDetailOptions?: undefined | ListDetailProps;
     selectMoreFields?: Select<TBaseModel>;
     initialItemsOnPage?: number;
     isDeleteable: boolean;
-    isEditable: boolean;
+    isEditable?: boolean | undefined;
     isCreateable: boolean;
     disablePagination?: undefined | boolean;
-    formFields?: undefined | Fields<TBaseModel>;
+    formFields?: undefined | Array<ModelField<TBaseModel>>;
     formSteps?: undefined | Array<FormStep<TBaseModel>>;
     noItemsMessage?: undefined | string;
     showRefreshButton?: undefined | boolean;
@@ -110,6 +111,7 @@ export interface ComponentProps<TBaseModel extends BaseModel> {
     pluralName?: string | undefined;
     actionButtons?: Array<ActionButtonSchema> | undefined;
     deleteButtonText?: string | undefined;
+    onCreateEditModalClose?: (() => void) | undefined;
     editButtonText?: string | undefined;
     viewButtonText?: string | undefined;
     refreshToggle?: boolean | undefined;
@@ -131,8 +133,9 @@ export interface ComponentProps<TBaseModel extends BaseModel> {
         shouldAddItemInTheEnd?: boolean;
         shouldAddItemInTheBeginning?: boolean;
     };
-    onViewComplete: (item: TBaseModel) => void;
+    onViewComplete?: ((item: TBaseModel) => void) | undefined;
     name: string;
+    modelAPI?: typeof ModelAPI | undefined;
 }
 
 enum ModalType {
@@ -140,10 +143,14 @@ enum ModalType {
     Edit,
 }
 
-const ModelTable: Function = <TBaseModel extends BaseModel>(
+const ModelTable: <TBaseModel extends BaseModel>(
+    props: ComponentProps<TBaseModel>
+) => ReactElement = <TBaseModel extends BaseModel>(
     props: ComponentProps<TBaseModel>
 ): ReactElement => {
     let showTableAs: ShowTableAs | undefined = props.showTableAs;
+
+    const modelAPI: typeof ModelAPI = props.modelAPI || ModelAPI;
 
     if (!showTableAs) {
         showTableAs = ShowTableAs.Table;
@@ -157,6 +164,13 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
     const [actionButtonSchema, setActionButtonSchema] = useState<
         Array<ActionButtonSchema>
     >([]);
+
+    useEffect(() => {
+        if (props.showCreateForm) {
+            setShowModal(true);
+            setModalType(ModalType.Create);
+        }
+    }, [props.showCreateForm]);
 
     const [orderedStatesListNewItemOrder, setOrderedStatesListNewItemOrder] =
         useState<number | null>(null);
@@ -199,6 +213,12 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
     const [errorModalText, setErrorModalText] = useState<string>('');
 
     useEffect(() => {
+        if (!showModel) {
+            props.onCreateEditModalClose && props.onCreateEditModalClose();
+        }
+    }, [showModel]);
+
+    useEffect(() => {
         const detailFields: Array<Field> = [];
         for (const column of tableColumns) {
             if (!column.key) {
@@ -233,7 +253,7 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
         setIsLoading(true);
 
         try {
-            await ModelAPI.deleteItem<TBaseModel>(
+            await modelAPI.deleteItem<TBaseModel>(
                 props.modelType,
                 item.id,
                 props.deleteRequestOptions
@@ -273,7 +293,8 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
             model.getColumnAccessControlForAllColumns();
 
         for (const column of props.columns || []) {
-            const hasPermission: boolean = hasPermissionToReadColumn(column);
+            const hasPermission: boolean =
+                hasPermissionToReadColumn(column) || User.isMasterAdmin();
             const key: string | null = getColumnKey(column);
 
             if (hasPermission) {
@@ -431,7 +452,7 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
                 const query: Query<BaseModel> = column.filterQuery || {};
 
                 const listResult: ListResult<BaseModel> =
-                    await ModelAPI.getList<BaseModel>(
+                    await modelAPI.getList<BaseModel>(
                         column.filterEntityType,
                         query,
                         LIMIT_PER_PROJECT,
@@ -491,7 +512,7 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
 
         try {
             const listResult: ListResult<TBaseModel> =
-                await ModelAPI.getList<TBaseModel>(
+                await modelAPI.getList<TBaseModel>(
                     props.modelType,
                     {
                         ...query,
@@ -599,9 +620,14 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
                     name: true,
                 };
             } else if (key && model.isEntityColumn(key)) {
-                (relationSelect as JSONObject)[key] = (column.field as any)[
-                    key
-                ];
+                if (!(relationSelect as JSONObject)[key]) {
+                    (relationSelect as JSONObject)[key] = {};
+                }
+
+                (relationSelect as JSONObject)[key] = {
+                    ...((relationSelect as JSONObject)[key] as JSONObject),
+                    ...(column.field as any)[key],
+                };
             }
         }
 
@@ -622,7 +648,8 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
         let hasPermissionToCreate: boolean = false;
 
         if (permissions) {
-            hasPermissionToCreate = model.hasCreatePermissions(permissions);
+            hasPermissionToCreate =
+                model.hasCreatePermissions(permissions) || User.isMasterAdmin();
         }
 
         // because ordered list add button is inside the table and not on the card header.
@@ -776,7 +803,7 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
         serializeToTableColumns();
     }, [data]);
 
-    const setActionSchema: Function = () => {
+    const setActionSchema: () => void = () => {
         const permissions: Array<Permission> =
             PermissionUtil.getAllPermissions();
 
@@ -810,7 +837,10 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
         }
 
         if (permissions) {
-            if (props.isViewable && model.hasReadPermissions(permissions)) {
+            if (
+                props.isViewable &&
+                (model.hasReadPermissions(permissions) || User.isMasterAdmin())
+            ) {
                 actionsSchema.push({
                     title:
                         props.viewButtonText ||
@@ -1014,7 +1044,7 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
 
                     setIsLoading(true);
 
-                    await ModelAPI.updateById(
+                    await modelAPI.updateById(
                         props.modelType,
                         new ObjectID(id),
                         {
@@ -1132,7 +1162,7 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
 
                     setIsLoading(true);
 
-                    await ModelAPI.updateById(
+                    await modelAPI.updateById(
                         props.modelType,
                         new ObjectID(id),
                         {
@@ -1172,30 +1202,47 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
     ): ReactElement => {
         const plan: PlanSelect | null = ProjectUtil.getCurrentPlan();
 
+        let showPlan: boolean = Boolean(
+            BILLING_ENABLED &&
+                plan &&
+                new props.modelType().readBillingPlan &&
+                !SubscriptionPlan.isFeatureAccessibleOnCurrentPlan(
+                    new props.modelType().readBillingPlan!,
+                    plan,
+                    getAllEnvVars()
+                )
+        );
+
+        let planName: string = new props.modelType().readBillingPlan!;
+
+        if (props.isCreateable && !showPlan) {
+            // if createable then read create billing permissions.
+            showPlan = Boolean(
+                BILLING_ENABLED &&
+                    plan &&
+                    new props.modelType().createBillingPlan &&
+                    !SubscriptionPlan.isFeatureAccessibleOnCurrentPlan(
+                        new props.modelType().createBillingPlan!,
+                        plan,
+                        getAllEnvVars()
+                    )
+            );
+
+            planName = new props.modelType().createBillingPlan!;
+        }
+
         return (
             <span>
                 {title}
-                {BILLING_ENABLED &&
-                    plan &&
-                    new props.modelType().readBillingPlan &&
-                    !SubscriptionPlan.isFeatureAccessibleOnCurrentPlan(
-                        new props.modelType().readBillingPlan!,
-                        plan,
-                        getAllEnvVars()
-                    ) && (
-                        <span
-                            style={{
-                                marginLeft: '5px',
-                            }}
-                        >
-                            <Pill
-                                text={`${
-                                    new props.modelType().readBillingPlan
-                                } Plan`}
-                                color={Yellow}
-                            />
-                        </span>
-                    )}
+                {showPlan && (
+                    <span
+                        style={{
+                            marginLeft: '5px',
+                        }}
+                    >
+                        <Pill text={`${planName} Plan`} color={Yellow} />
+                    </span>
+                )}
             </span>
         );
     };
@@ -1289,6 +1336,7 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
 
             {showModel ? (
                 <ModelFormModal<TBaseModel>
+                    modelAPI={props.modelAPI}
                     title={
                         modalType === ModalType.Create
                             ? `${props.createVerb || 'Create'} New ${
@@ -1321,13 +1369,15 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
                               }`
                             : `Save Changes`
                     }
-                    onSuccess={async (item: TBaseModel) => {
+                    onSuccess={async (item: TBaseModel): Promise<void> => {
                         setShowModal(false);
                         setCurrentPageNumber(1);
                         fetchItems();
                         if (props.onCreateSuccess) {
                             await props.onCreateSuccess(item);
                         }
+
+                        return Promise.resolve();
                     }}
                     onBeforeCreate={async (
                         item: TBaseModel,
@@ -1355,7 +1405,8 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
                     }}
                     modelType={props.modelType}
                     formProps={{
-                        model: model,
+                        name: `create-${props.modelType.name}-from`,
+                        modelType: props.modelType,
                         id: `create-${props.modelType.name}-from`,
                         fields: props.formFields || [],
                         steps: props.formSteps || [],
@@ -1363,7 +1414,6 @@ const ModelTable: Function = <TBaseModel extends BaseModel>(
                             modalType === ModalType.Create
                                 ? FormType.Create
                                 : FormType.Update,
-                        type: props.modelType,
                     }}
                     modelIdToEdit={
                         currentEditableItem

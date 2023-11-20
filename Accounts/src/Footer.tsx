@@ -1,7 +1,7 @@
-import React, { FunctionComponent } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 
-const Footer: FunctionComponent = () => {
+const Footer: () => JSX.Element = () => {
     return (
         <div className="footer">
             <p>

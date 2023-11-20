@@ -1,4 +1,4 @@
-import { ColumnAccessControl } from 'Common/Types/Database/AccessControl/AccessControl';
+import { ColumnAccessControl } from 'Common/Types/BaseDatabase/AccessControl';
 import { getTableColumns } from 'Common/Types/Database/TableColumn';
 import Dictionary from 'Common/Types/Dictionary';
 import ObjectID from 'Common/Types/ObjectID';
@@ -6,7 +6,7 @@ import Permission, {
     PermissionHelper,
     PermissionProps,
 } from 'Common/Types/Permission';
-import { DashboardApiRoute } from 'CommonServer/Config';
+import { DashboardApiRoute } from 'Common/ServiceRoute';
 import LocalCache from 'CommonServer/Infrastructure/LocalCache';
 import { ExpressRequest, ExpressResponse } from 'CommonServer/Utils/Express';
 import LocalFile from 'CommonServer/Utils/LocalFile';
@@ -228,6 +228,9 @@ export default class ServiceHandler {
         pageData.apiPath =
             DashboardApiRoute.toString() +
             currentResource.model.crudApiPath?.toString();
+
+        pageData.isMasterAdminApiDocs =
+            currentResource.model.isMasterAdminApiDocs;
 
         return res.render('pages/index', {
             page: page,

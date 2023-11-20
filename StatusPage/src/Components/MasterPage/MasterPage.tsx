@@ -11,8 +11,7 @@ import React, {
 } from 'react';
 import URL from 'Common/Types/API/URL';
 import PageLoader from 'CommonUI/src/Components/Loader/PageLoader';
-import BaseAPI from 'CommonUI/src/Utils/API/API';
-import { DASHBOARD_API_URL } from 'CommonUI/src/Config';
+import { STATUS_PAGE_API_URL } from '../../Utils/Config';
 import Navigation from 'CommonUI/src/Utils/Navigation';
 import ObjectID from 'Common/Types/ObjectID';
 import BadDataException from 'Common/Types/Exception/BadDataException';
@@ -32,9 +31,9 @@ import Link from 'Common/Types/Link';
 import JSONWebTokenData from 'Common/Types/JsonWebTokenData';
 import JSONWebToken from 'CommonUI/src/Utils/JsonWebToken';
 import Route from 'Common/Types/API/Route';
-import User from '../../Utils/User';
 import LoginUtil from '../../Utils/Login';
 import StatusPageUtil from '../../Utils/StatusPage';
+import API from '../../Utils/API';
 
 export interface ComponentProps {
     children: ReactElement | Array<ReactElement>;
@@ -43,6 +42,7 @@ export interface ComponentProps {
     onLoadComplete: (masterPage: JSONObject) => void;
     isPreview: boolean;
     isPrivateStatusPage: boolean;
+    enableSubscribers: boolean;
 }
 
 const DashboardMasterPage: FunctionComponent<ComponentProps> = (
@@ -62,10 +62,9 @@ const DashboardMasterPage: FunctionComponent<ComponentProps> = (
     useEffect(() => {
         // if there is an SSO token. We need to save that to localstorage.
 
-        const sso_token: string | null =
-            Navigation.getQueryStringByName('sso_token');
+        const token: string | null = Navigation.getQueryStringByName('token');
 
-        if (sso_token && statusPageId) {
+        if (token && statusPageId) {
             // set token.
 
             const logoutRoute: Route = props.isPreview
@@ -79,36 +78,33 @@ const DashboardMasterPage: FunctionComponent<ComponentProps> = (
                   );
 
             const decodedtoken: JSONWebTokenData | null = JSONWebToken.decode(
-                sso_token
+                token
             ) as JSONWebTokenData;
 
             if (!decodedtoken) {
-                alert('Invalid SSO Token. Please log in again.');
+                alert('Invalid Token. Please log in again.');
                 return Navigation.navigate(logoutRoute);
             }
 
             if (!decodedtoken.userId.toString()) {
-                alert('USer ID not found in SSO Token. Logging out.');
+                alert('User ID not found in Token. Logging out.');
                 return Navigation.navigate(logoutRoute);
             }
 
             LoginUtil.login({
-                token: sso_token,
                 user: { ...decodedtoken, _id: decodedtoken.userId },
+                token: token,
             });
 
             if (!decodedtoken.statusPageId) {
-                alert(
-                    'Status Page ID not found in the SSO token. Logging out.'
-                );
+                alert('Status Page ID not found in the token. Logging out.');
                 return Navigation.navigate(logoutRoute);
             }
 
-            User.setAccessToken(decodedtoken.statusPageId!, sso_token);
-
             if (Navigation.getQueryStringByName('redirectUrl')) {
                 Navigation.navigate(
-                    new Route(Navigation.getQueryStringByName('redirectUrl')!)
+                    new Route(Navigation.getQueryStringByName('redirectUrl')!),
+                    { forceNavigate: true }
                 );
             } else {
                 Navigation.navigate(
@@ -120,7 +116,8 @@ const DashboardMasterPage: FunctionComponent<ComponentProps> = (
                         : RouteUtil.populateRouteParams(
                               RouteMap[PageMap.PREVIEW_OVERVIEW]!,
                               statusPageId
-                          )
+                          ),
+                    { forceNavigate: true }
                 );
             }
         }
@@ -137,16 +134,13 @@ const DashboardMasterPage: FunctionComponent<ComponentProps> = (
             }
         }
         // get status page id by hostname.
-        const response: HTTPResponse<JSONObject> =
-            await BaseAPI.post<JSONObject>(
-                URL.fromString(DASHBOARD_API_URL.toString()).addRoute(
-                    `/status-page/domain`
-                ),
-                {
-                    domain: Navigation.getHostname().toString(),
-                },
-                {}
-            );
+        const response: HTTPResponse<JSONObject> = await API.post<JSONObject>(
+            URL.fromString(STATUS_PAGE_API_URL.toString()).addRoute(`/domain`),
+            {
+                domain: Navigation.getHostname().toString(),
+            },
+            {}
+        );
 
         if (response.data && response.data['statusPageId']) {
             return new ObjectID(response.data['statusPageId'] as string);
@@ -164,9 +158,9 @@ const DashboardMasterPage: FunctionComponent<ComponentProps> = (
 
             LocalStorage.setItem('statusPageId', id);
             const response: HTTPResponse<JSONObject> =
-                await BaseAPI.post<JSONObject>(
-                    URL.fromString(DASHBOARD_API_URL.toString()).addRoute(
-                        `/status-page/master-page/${id.toString()}`
+                await API.post<JSONObject>(
+                    URL.fromString(STATUS_PAGE_API_URL.toString()).addRoute(
+                        `/master-page/${id.toString()}`
                     ),
                     {},
                     {}
@@ -224,7 +218,7 @@ const DashboardMasterPage: FunctionComponent<ComponentProps> = (
 
             setIsLoading(false);
         } catch (err) {
-            setError(BaseAPI.getFriendlyMessage(err));
+            setError(API.getFriendlyMessage(err));
             setIsLoading(false);
         }
     }, []);
@@ -308,6 +302,7 @@ const DashboardMasterPage: FunctionComponent<ComponentProps> = (
                         isPrivateStatusPage={props.isPrivateStatusPage}
                         show={true}
                         isPreview={true}
+                        enableSubscribers={props.enableSubscribers}
                     />
                     {props.children}
                     {!footerHtml ? (

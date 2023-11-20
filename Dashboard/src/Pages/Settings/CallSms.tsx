@@ -64,7 +64,6 @@ const Settings: FunctionComponent<PageComponentProps> = (
                         title: 'Current Balance',
                         description:
                             'Here is your current call and SMS balance for this project.',
-                        icon: IconProp.Billing,
                         buttons: [
                             {
                                 title: 'Recharge Balance',
@@ -93,7 +92,7 @@ const Settings: FunctionComponent<PageComponentProps> = (
                                 placeholder: '0 USD',
                             },
                         ],
-                        modelId: DashboardNavigation.getProjectId()?.toString(),
+                        modelId: DashboardNavigation.getProjectId()!,
                     }}
                 />
             ) : (
@@ -106,7 +105,6 @@ const Settings: FunctionComponent<PageComponentProps> = (
                     title: 'Enable Notifications',
                     description:
                         'Enable Call and SMS notifications for this project.',
-                    icon: IconProp.Notification,
                 }}
                 isEditable={true}
                 editButtonText="Edit Notification Settings"
@@ -157,7 +155,7 @@ const Settings: FunctionComponent<PageComponentProps> = (
                                 'Enable SMS notifications for this project. This will be used for alerting users by SMS.',
                         },
                     ],
-                    modelId: DashboardNavigation.getProjectId()?.toString(),
+                    modelId: DashboardNavigation.getProjectId()!,
                 }}
             />
 
@@ -168,7 +166,6 @@ const Settings: FunctionComponent<PageComponentProps> = (
                         title: 'Auto Recharge',
                         description:
                             'Enable Auto Recharge for call and SMS balance. This will make sure you always have enough balance for sending SMS or making calls.',
-                        icon: IconProp.Billing,
                     }}
                     isEditable={true}
                     editButtonText="Edit Auto Recharge"
@@ -321,7 +318,7 @@ const Settings: FunctionComponent<PageComponentProps> = (
                                 placeholder: '0 USD',
                             },
                         ],
-                        modelId: DashboardNavigation.getProjectId()?.toString(),
+                        modelId: DashboardNavigation.getProjectId()!,
                     }}
                 />
             ) : (
@@ -335,7 +332,6 @@ const Settings: FunctionComponent<PageComponentProps> = (
                         setShowRechargeBalanceModal(false);
                     }}
                     isLoading={isRechargeBalanceLoading}
-                    name="Recharge Balance"
                     submitButtonText={'Recharge'}
                     onSubmit={async (item: JSONObject) => {
                         setIsRechargeBalanceLoading(true);
@@ -369,6 +365,7 @@ const Settings: FunctionComponent<PageComponentProps> = (
                         }
                     }}
                     formProps={{
+                        name: 'Recharge Balance',
                         error: rechargeBalanceError || '',
                         fields: [
                             {

@@ -97,7 +97,6 @@ const CustomSMTP: FunctionComponent<PageComponentProps> = (
                 isEditable={true}
                 isCreateable={true}
                 cardProps={{
-                    icon: IconProp.Email,
                     title: 'Custom SMTP Configs',
                     description:
                         'If you need OneUptime to send emails through your SMTP Server, please enter the server details here.',
@@ -186,7 +185,7 @@ const CustomSMTP: FunctionComponent<PageComponentProps> = (
                         title: 'Username',
                         stepId: 'authentication',
                         fieldType: FormFieldSchemaType.Text,
-                        required: true,
+                        required: false,
                         placeholder: 'emailuser',
                     },
                     {
@@ -196,7 +195,7 @@ const CustomSMTP: FunctionComponent<PageComponentProps> = (
                         title: 'Password',
                         stepId: 'authentication',
                         fieldType: FormFieldSchemaType.EncryptedText,
-                        required: true,
+                        required: false,
                         placeholder: 'Password',
                     },
                     {
@@ -259,8 +258,8 @@ const CustomSMTP: FunctionComponent<PageComponentProps> = (
                 <BasicFormModal
                     title={`Send Test Email`}
                     description={`Send a test email to verify your SMTP config.`}
-                    error={error}
                     formProps={{
+                        error: error,
                         fields: [
                             {
                                 field: {
@@ -327,7 +326,12 @@ const CustomSMTP: FunctionComponent<PageComponentProps> = (
             {showSuccessModal ? (
                 <ConfirmModal
                     title={`Email Sent`}
-                    error={error}
+                    error={
+                        error ===
+                        'Error connecting to server. Please try again in few minutes.'
+                            ? 'Request timed out. Please check your SMTP credentials and make sure they are correct.'
+                            : error
+                    }
                     description={`Email sent successfully. It should take couple of minutes to arrive, please don't forget to check spam.`}
                     submitButtonType={ButtonStyleType.NORMAL}
                     submitButtonText={'Close'}

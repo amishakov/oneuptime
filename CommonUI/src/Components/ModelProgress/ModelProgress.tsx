@@ -15,7 +15,9 @@ export interface ComponentProps<TBaseModel extends BaseModel> {
     modelType: { new (): TBaseModel };
 }
 
-const ModelProgress: Function = <TBaseModel extends BaseModel>(
+const ModelProgress: <TBaseModel extends BaseModel>(
+    props: ComponentProps<TBaseModel>
+) => ReactElement = <TBaseModel extends BaseModel>(
     props: ComponentProps<TBaseModel>
 ): ReactElement => {
     const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -48,7 +50,7 @@ const ModelProgress: Function = <TBaseModel extends BaseModel>(
 
     return (
         <Card title={props.title} description={props.description}>
-            <div className="w-full -mt-20">
+            <div className="w-full -mt-6">
                 {!error && (
                     <div>
                         <ErrorMessage error={error} />

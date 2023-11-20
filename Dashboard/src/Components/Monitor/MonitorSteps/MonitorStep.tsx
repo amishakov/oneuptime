@@ -8,6 +8,7 @@ import FieldLabelElement from 'CommonUI/src/Components/Forms/Fields/FieldLabel';
 import MonitorStep from 'Common/Types/Monitor/MonitorStep';
 import MonitorCriteriaElement from './MonitorCriteria';
 import MonitorType from 'Common/Types/Monitor/MonitorType';
+import MonitorCriteria from 'Common/Types/Monitor/MonitorCriteria';
 import HorizontalRule from 'CommonUI/src/Components/HorizontalRule/HorizontalRule';
 import Detail from 'CommonUI/src/Components/Detail/Detail';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
@@ -114,7 +115,7 @@ const MonitorStepElement: FunctionComponent<ComponentProps> = (
             <div className="mt-5">
                 <Detail
                     id={'monitor-step'}
-                    item={props.monitorStep.data}
+                    item={props.monitorStep.data as any}
                     fields={requestDetailsFields}
                 />
             </div>
@@ -135,7 +136,10 @@ const MonitorStepElement: FunctionComponent<ComponentProps> = (
                     onCallPolicyOptions={props.onCallPolicyOptions}
                     monitorStatusOptions={props.monitorStatusOptions}
                     incidentSeverityOptions={props.incidentSeverityOptions}
-                    monitorCriteria={props.monitorStep?.data?.monitorCriteria!}
+                    monitorCriteria={
+                        props.monitorStep?.data
+                            ?.monitorCriteria as MonitorCriteria
+                    }
                 />
             </div>
         </div>

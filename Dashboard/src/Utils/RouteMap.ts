@@ -16,6 +16,7 @@ const RouteMap: Dictionary<Route> = {
     [PageMap.INIT_PROJECT]: new Route(`/dashboard/${RouteParams.ProjectID}`),
 
     [PageMap.HOME]: new Route(`/dashboard/${RouteParams.ProjectID}/home/`),
+
     [PageMap.HOME_NOT_OPERATIONAL_MONITORS]: new Route(
         `/dashboard/${RouteParams.ProjectID}/home/monitors-inoperational`
     ),
@@ -310,8 +311,35 @@ const RouteMap: Dictionary<Route> = {
     [PageMap.REPORTS]: new Route(
         `/dashboard/${RouteParams.ProjectID}/reports/`
     ),
+
     [PageMap.ERROR_TRACKER]: new Route(
         `/dashboard/${RouteParams.ProjectID}/error-tracker/`
+    ),
+
+    [PageMap.TELEMETRY]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/telemetry/services`
+    ),
+
+    [PageMap.TELEMETRY_SERVICES]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/telemetry/services`
+    ),
+
+    [PageMap.TELEMETRY_SERVICES_VIEW]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/telemetry/services/${RouteParams.ModelID}`
+    ),
+
+    [PageMap.TELEMETRY_SERVICES_VIEW_DELETE]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/telemetry/services/${RouteParams.ModelID}/delete`
+    ),
+
+    //TELEMETRY_SERVICE_VIEW_LOGS
+    [PageMap.TELEMETRY_SERVICES_VIEW_LOGS]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/telemetry/services/${RouteParams.ModelID}/logs`
+    ),
+
+    //TELEMETRY_SERVICE_VIEW_TRACES
+    [PageMap.TELEMETRY_SERVICES_VIEW_TRACES]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/telemetry/services/${RouteParams.ModelID}/traces`
     ),
 
     // User Settings Routes
@@ -397,12 +425,40 @@ const RouteMap: Dictionary<Route> = {
         `/dashboard/${RouteParams.ProjectID}/settings/domains`
     ),
 
+    [PageMap.SETTINGS_FEATURE_FLAGS]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/settings/feature-flags`
+    ),
+
     [PageMap.SETTINGS_SSO]: new Route(
         `/dashboard/${RouteParams.ProjectID}/settings/sso`
     ),
 
     [PageMap.SETTINGS_TEAMS]: new Route(
         `/dashboard/${RouteParams.ProjectID}/settings/teams`
+    ),
+
+    [PageMap.SETTINGS_INCIDENT_TEMPLATES]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/settings/incident-templates`
+    ),
+
+    [PageMap.SETTINGS_INCIDENT_TEMPLATES_VIEW]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/settings/incident-templates/${RouteParams.ModelID}`
+    ),
+
+    [PageMap.SETTINGS_INCIDENT_NOTE_TEMPLATES]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/settings/incident-note-templates`
+    ),
+
+    [PageMap.SETTINGS_INCIDENT_NOTE_TEMPLATES_VIEW]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/settings/incident-note-templates/${RouteParams.ModelID}`
+    ),
+
+    [PageMap.SETTINGS_SCHEDULED_MAINTENANCE_NOTE_TEMPLATES]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/settings/scheduled-maintenance-note-templates`
+    ),
+
+    [PageMap.SETTINGS_SCHEDULED_MAINTENANCE_NOTE_TEMPLATES_VIEW]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/settings/scheduled-maintenance-note-templates/${RouteParams.ModelID}`
     ),
 
     [PageMap.SETTINGS_BILLING]: new Route(
@@ -460,6 +516,10 @@ const RouteMap: Dictionary<Route> = {
         `/dashboard/${RouteParams.ProjectID}/workflows/workflow/${RouteParams.ModelID}/delete`
     ),
 
+    [PageMap.WORKFLOW_VIEW_SETTINGS]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/workflows/workflow/${RouteParams.ModelID}/settings`
+    ),
+
     /// custom fields settings.
 
     [PageMap.SETTINGS_MONITOR_CUSTOM_FIELDS]: new Route(
@@ -483,6 +543,30 @@ const RouteMap: Dictionary<Route> = {
 
     // logout.
     [PageMap.LOGOUT]: new Route(`/dashboard/logout`),
+
+    [PageMap.MONITOR_GROUPS]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/monitor-groups`
+    ),
+
+    [PageMap.MONITOR_GROUP_VIEW]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/monitor-groups/${RouteParams.ModelID}`
+    ),
+
+    [PageMap.MONITOR_GROUP_VIEW_DELETE]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/monitor-groups/${RouteParams.ModelID}/delete`
+    ),
+
+    [PageMap.MONITOR_GROUP_VIEW_MONITORS]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/monitor-groups/${RouteParams.ModelID}/monitors`
+    ),
+
+    [PageMap.MONITOR_GROUP_VIEW_OWNERS]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/monitor-groups/${RouteParams.ModelID}/owners`
+    ),
+
+    [PageMap.MONITOR_GROUP_VIEW_INCIDENTS]: new Route(
+        `/dashboard/${RouteParams.ProjectID}/monitor-groups/${RouteParams.ModelID}/incidents`
+    ),
 };
 
 export class RouteUtil {

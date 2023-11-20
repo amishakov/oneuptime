@@ -18,7 +18,7 @@ import TenantColumn from 'Common/Types/Database/TenantColumn';
 import TableMetadata from 'Common/Types/Database/TableMetadata';
 import IconProp from 'Common/Types/Icon/IconProp';
 import DomainType from 'Common/Types/Domain';
-import EnableDocumentation from 'Common/Types/Model/EnableDocumentation';
+import EnableDocumentation from 'Common/Types/Database/EnableDocumentation';
 
 @EnableDocumentation()
 @TenantColumn('projectId')
@@ -31,6 +31,7 @@ import EnableDocumentation from 'Common/Types/Model/EnableDocumentation';
     read: [
         Permission.ProjectOwner,
         Permission.ProjectAdmin,
+        Permission.ProjectMember,
         Permission.CanReadProjectDomain,
     ],
     delete: [
@@ -66,6 +67,7 @@ export default class Domain extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectDomain,
         ],
         update: [],
@@ -101,6 +103,7 @@ export default class Domain extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectDomain,
         ],
         update: [],
@@ -130,6 +133,7 @@ export default class Domain extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectDomain,
         ],
         update: [
@@ -159,6 +163,7 @@ export default class Domain extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectDomain,
         ],
         update: [],
@@ -186,6 +191,7 @@ export default class Domain extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectDomain,
         ],
         update: [],
@@ -221,6 +227,7 @@ export default class Domain extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectDomain,
         ],
         update: [],
@@ -243,6 +250,7 @@ export default class Domain extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectDomain,
         ],
         update: [],
@@ -274,6 +282,7 @@ export default class Domain extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectDomain,
         ],
         update: [],
@@ -296,6 +305,7 @@ export default class Domain extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectDomain,
         ],
         update: [
@@ -325,6 +335,7 @@ export default class Domain extends BaseModel {
         read: [
             Permission.ProjectOwner,
             Permission.ProjectAdmin,
+            Permission.ProjectMember,
             Permission.CanReadProjectDomain,
         ],
         update: [],

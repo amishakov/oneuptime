@@ -45,7 +45,8 @@
         "workbox": true,
         "importScripts": true,
         "$TSFixMe": true,
-        "NodeJS": true
+        "NodeJS": true,
+        "JSX": true
     },
     "parser": "@typescript-eslint/parser",
     "rules": {
@@ -86,10 +87,11 @@
           ],
         // https://www.npmjs.com/package/eslint-plugin-unused-imports
         "no-unused-vars": "off",
-        "@typescript-eslint/no-unused-vars": "off",
+        "@typescript-eslint/no-unused-vars": ["error", {"argsIgnorePattern": "^_"}],
         "@typescript-eslint/no-extra-non-null-assertion": "error",
         "@typescript-eslint/no-floating-promises":"error",
         "@typescript-eslint/await-thenable":"error",
+        "@typescript-eslint/no-non-null-asserted-optional-chain": "error",
         "unused-imports/no-unused-imports": "error",
         "unused-imports/no-unused-vars": [
             "error",
@@ -177,7 +179,9 @@
                 "ignoreReadBeforeAssign": false
             }
         ],
-        "no-var": "error"
+        "no-var": "error",
+        "object-curly-spacing": ["error", "always"],
+        "no-unneeded-ternary": "error"
     },
     "settings": {
         "react": {

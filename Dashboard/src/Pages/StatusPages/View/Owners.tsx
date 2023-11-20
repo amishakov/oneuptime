@@ -12,7 +12,6 @@ import ModelTable from 'CommonUI/src/Components/ModelTable/ModelTable';
 import StatusPageOwnerTeam from 'Model/Models/StatusPageOwnerTeam';
 import DashboardNavigation from '../../../Utils/Navigation';
 import BadDataException from 'Common/Types/Exception/BadDataException';
-import IconProp from 'Common/Types/Icon/IconProp';
 import FormFieldSchemaType from 'CommonUI/src/Components/Forms/Types/FormFieldSchemaType';
 import Team from 'Model/Models/Team';
 import FieldType from 'CommonUI/src/Components/Types/FieldType';
@@ -88,8 +87,7 @@ const StatusPageOwners: FunctionComponent<PageComponentProps> = (
                     return Promise.resolve(item);
                 }}
                 cardProps={{
-                    icon: IconProp.Team,
-                    title: 'Owners - Teams',
+                    title: 'Owners (Teams)',
                     description:
                         'Here is list of teams that own this status page. They will be alerted when this status page is created or updated.',
                 }}
@@ -165,8 +163,7 @@ const StatusPageOwners: FunctionComponent<PageComponentProps> = (
                     return Promise.resolve(item);
                 }}
                 cardProps={{
-                    icon: IconProp.Team,
-                    title: 'Owners - User',
+                    title: 'Owners (Users)',
                     description:
                         'Here is list of users that own this status page. They will be alerted when this status page is created or updated.',
                 }}
